@@ -7,10 +7,10 @@ on:
 # Runs the same entry points developers use, so CI and local verification cannot drift.
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Checks, unit and integration tests, shell tests
