@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/erancha/home-finance-agent/main/docs/a2a-contract/rows.schema.json",
+  "title": "Rows",
+  "description": "The batch of categorized transactions a card agent returns for a month; docs/a2a-contract.md is the contract.",
+  "type": "object",
+  "required": [
+    "month",
+    "currency",
+    "transactions"
+  ],
+  "properties": {
+    "month": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+      "maxLength": 7
+    },
+    "currency": {
+      "const": "ILS"
+    },
+    "transactions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transaction"
+      },
+      "maxItems": 25
+    }
+  },
+  "$defs": {
+    "transaction": {
+      "type": "object",
+      "required": [
+        "id",
+        "transactionDate",
+        "chargeDate",
+        "merchant",
+        "rawMerchant",
+        "amount",
+        "originalAmount",
+        "originalCurrency",
+        "standingOrder",
+        "abroad",
+        "installment",
+        "category",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transactionDate": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+          "maxLength": 10
+        },
+        "chargeDate": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+          "maxLength": 10
+        },
+        "merchant": {
+          "type": "string"
+        },
+        "rawMerchant": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "originalAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "originalCurrency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standingOrder": {
+          "type": "boolean"
+        },
+        "abroad": {
+          "type": "boolean"
+        },
+        "installment": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "number",
+                "total"
+              ],
+              "properties": {
+                "number": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "total": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "category": {
+          "enum": [
+            "groceries",
+            "dining",
+            "transport",
+            "utilities",
+            "housing",
+            "health",
+            "insurance",
+            "education",
+            "shopping",
+            "entertainment",
+            "travel",
+            "gifts",
+            "other",
+            "uncategorized"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        }
+      }
+    }
+  }
+}

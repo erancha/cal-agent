@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+# Runs the same entry points developers use, so CI and local verification cannot drift.
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Checks, unit and integration tests, shell tests
+        run: bash scripts/test.sh all
+      - name: Client-side validation
+        run: bash scripts/validate.sh

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/erancha/home-finance-agent/main/docs/a2a-contract/request.schema.json",
+  "title": "Request",
+  "description": "The data part of the message a card agent receives from the home finance agent; docs/a2a-contract.md is the contract.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "month": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+          "maxLength": 7
+        }
+      },
+      "required": [
+        "month"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "continue"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

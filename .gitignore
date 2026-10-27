@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+allowed-callers.yaml
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.claude/
+CLAUDE.local.md
+
+# The person's real statements and the anonymization mapping never enter the repo.
+/statements/
+*.real.pdf
+anonymize-*.json
+
+# Output of validate.sh and the conformance suite checkout.
+/.validate/
+/.tck/

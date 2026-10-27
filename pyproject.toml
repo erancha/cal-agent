@@ -1,0 +1,90 @@
+[project]
+name = "calagent"
+version = "0.1.0"
+description = "Cal card agent: reads Cal credit-card PDF statements and streams rows over A2A"
+license = "MIT"
+authors = [{ name = "Eran C", email = "erancha@gmail.com" }]
+requires-python = ">=3.14"
+dependencies = [
+    "a2a-sdk[fastapi]>=1.2.2,<2",
+    "fastapi>=0.143",
+    "uvicorn[standard]>=0.54",
+    "python-multipart>=0.0.20",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.15",
+    "pdfplumber>=0.11",
+    "anthropic>=2",
+    "openai>=3",
+    "redis>=6.4",
+    "PyJWT[crypto]>=2.10",
+    "pyyaml>=6.0",
+    "structlog>=26",
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=1.4",
+    "testcontainers>=4.15",
+    "ruff>=0.17,<0.18",
+    "mypy>=2.4",
+    "types-PyYAML>=6",
+    "import-linter>=2.15",
+    "pip-tools>=7.6",
+    "pypdf>=6",
+    "jsonschema>=4.23",
+    "packaging>=24",
+    "httpx2>=2",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"
+markers = ["integration: needs Docker"]
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
+
+[tool.ruff.lint]
+extend-select = ["E501"]
+
+[tool.mypy]
+files = ["src"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["a2a.*", "google.protobuf.*", "pdfplumber.*", "testcontainers.*"]
+ignore_missing_imports = true
+
+[tool.importlinter]
+root_packages = ["calagent"]
+include_external_packages = true
+
+# platform composes everything; application uses ports and domain; adapters implement ports.
+[[tool.importlinter.contracts]]
+name = "Layers: platform over application over ports over domain"
+type = "layers"
+layers = ["calagent.platform", "calagent.application", "calagent.ports", "calagent.domain"]
+
+[[tool.importlinter.contracts]]
+name = "Adapters implement ports and never reach application or platform"
+type = "forbidden"
+source_modules = ["calagent.adapters"]
+forbidden_modules = ["calagent.application", "calagent.platform"]
+
+[[tool.importlinter.contracts]]
+name = "Inner layers are framework free"
+type = "forbidden"
+source_modules = ["calagent.domain", "calagent.ports", "calagent.application"]
+forbidden_modules = ["a2a", "fastapi", "starlette", "redis", "pdfplumber", "anthropic", "openai",
+    "httpx", "yaml", "structlog", "jwt"]

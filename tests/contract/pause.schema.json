@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/erancha/home-finance-agent/main/docs/a2a-contract/pause.schema.json",
+  "title": "Pause",
+  "description": "The data a card agent attaches when it pauses a review for the person; docs/a2a-contract.md is the contract.",
+  "type": "object",
+  "required": [
+    "reason",
+    "month",
+    "user"
+  ],
+  "properties": {
+    "reason": {
+      "enum": [
+        "statement-missing",
+        "sign-in-required"
+      ]
+    },
+    "month": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+      "maxLength": 7
+    },
+    "page": {
+      "type": "string",
+      "pattern": "^/(?!/)"
+    },
+    "user": {
+      "type": "string"
+    }
+  }
+}
