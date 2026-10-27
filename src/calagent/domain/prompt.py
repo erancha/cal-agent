@@ -13,13 +13,19 @@ from calagent.domain.taxonomy import TAXONOMY
 CATEGORY_GUIDES: dict[str, str] = {
     "groceries": "supermarkets, grocery stores, bakeries, butchers, greengrocers",
     "dining": "restaurants, cafes, bars, takeaway, food delivery",
-    "transport": "fuel, public transport, taxis, tolls, parking, car repairs, car licensing",
+    "transport": "fuel, public transport, taxis, tolls, parking, car repairs, car licensing, car"
+    " insurance",
     "utilities": "electricity, water, gas, phone, internet, water-filter rental",
-    "housing": "rent, property tax (arnona), building committee, home repairs, hardware stores",
-    "health": "clinics, doctors, dentists, pharmacies, gyms and fitness clubs",
-    "insurance": "insurance premiums of any kind",
+    "housing": "rent, property tax (arnona), building committee, home and appliance insurance,"
+    " appliances fixed to the building such as air conditioners and water heaters, home repairs,"
+    " hardware stores",
+    "health": "clinics, doctors, dentists, pharmacies, gyms and fitness clubs, health insurance",
+    "insurance": "only a policy that protects no other category's purpose, such as life insurance,"
+    " or one whose purpose the statement does not tell; car, health, home and appliance policies"
+    " go to transport, health and housing",
     "education": "schools, kindergartens, childcare, courses, children's activities",
-    "shopping": "clothing, electronics, electrical appliances, furniture, online marketplaces",
+    "shopping": "clothing, electronics, furniture, online marketplaces, appliances that move with"
+    " you",
     "entertainment": "streaming and TV, cinema, shows, games, hobbies, leisure clubs",
     "travel": "flights, hotels, car rental abroad, travel agencies",
     "gifts": "gift cards, flowers, presents, donations",
