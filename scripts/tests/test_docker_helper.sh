@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verifies docker-helper.sh refuses what it does not support before touching Docker: an unknown
-# command, and any argument after --stop or --ps (--stop --volumes included).
+# command, an unknown --stop option, and any argument after --ps. --stop --volumes is accepted.
 set -euo pipefail
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,8 +13,10 @@ refused() {  # expected-text args...
   grep -q "$expected" <<<"$out" || fail "'$*' refused without naming the cause: $out"
 }
 
-refused "takes no arguments (got: --volumes)" --stop --volumes
+refused "Unknown --stop option 'extra'" --stop extra
+refused "Unknown --stop option 'extra'" --stop --volumes extra
 refused "takes no arguments (got: extra)" --ps extra
 refused "Unknown command: --bogus" --bogus
+grep -q -- '--stop \[--volumes\]' "$SCRIPTS_DIR/docker-helper.sh" || fail "usage does not offer --volumes"
 
 echo "test_docker_helper: all checks passed"

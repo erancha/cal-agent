@@ -22,7 +22,7 @@ enforces this from `pyproject.toml`. `platform/a2a` holds everything that touche
 - `start.sh [--host]`: Docker (default: Redis, two replicas, nginx edge on :8030) or one uvicorn
   process with everything in memory; stops before launching when access is required and no
   callers file exists.
-- `docker-helper.sh --stop | --logs [-e] [service...] | --ps`.
+- `docker-helper.sh --stop [--volumes] | --logs [-e] [service...] | --ps`.
 - `test.sh [unit|it|all]`: ruff, mypy, lint-imports, pytest, then the shell tests in
   `scripts/tests/`; `all` (the default) and `it` include the integration tests, which need Docker.
 - `validate.sh [--tck]`: the agent on :8031 with `LLM_MODEL=keyword` and a throwaway key in place
