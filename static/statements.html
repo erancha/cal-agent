@@ -75,7 +75,7 @@
       Statement PDF (any file name; it is stored as YYYY-MM.pdf for its billing month)
     </label>
     <input id="file" type="file" accept="application/pdf,.pdf">
-    <div class="row"><button id="upload" type="button">Load</button></div>
+    <div class="row"><button id="upload" type="button" disabled>Load</button></div>
     <p id="status" role="status"></p>
   </section>
 
@@ -255,12 +255,17 @@
     return button;
   }
 
+  function offerLoad() {
+    upload.disabled = file.files.length === 0;
+  }
+
+  file.addEventListener("change", () => {
+    show("", "");
+    offerLoad();
+  });
+
   upload.addEventListener("click", async () => {
     const chosen = file.files[0];
-    if (!chosen) {
-      show("Choose a statement PDF first.", "err");
-      return;
-    }
     const form = new FormData();
     form.append("file", chosen);
     upload.disabled = true;
@@ -281,7 +286,7 @@
     } catch (e) {
       show("The agent did not answer: " + e.message, "err");
     } finally {
-      upload.disabled = false;
+      offerLoad();
     }
   });
 
