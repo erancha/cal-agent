@@ -1,7 +1,7 @@
-"""The agent's settings: environment variables read once at startup.
+"""The agent's settings: environment variables and the settings files, read once at startup.
 
-Nothing here reads a .env file; the scripts load it. A blank variable counts as unset. Every
-key is explained once, in .env.example.
+A blank variable counts as unset. Every key is explained once, in scripts/lib/stack-params.sh or
+in the .example.sh beside a gitignored settings file.
 """
 
 from datetime import timedelta
@@ -13,10 +13,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from calagent.adapters.google_tokens import GOOGLE_ISSUER, GOOGLE_JWKS_URL
 
+SETTINGS_FILES = (
+    "scripts/lib/stack-params.sh",
+    "scripts/lib/params.sh",
+    "scripts/lib/secrets.sh",
+)
+"""The stack's settings files, relative to the repo root; a later file wins over an earlier one.
+Each holds plain export KEY="value" lines, which the scripts source and this loader parses."""
+
 
 class Settings(BaseSettings):
+    """A variable of the environment wins over the same key of a settings file. The files are read
+    from the working directory, so an agent started from the repo root reads the files the scripts
+    share; a missing file is skipped, and in a container, which holds none of them, only the keys
+    compose passes apply."""
+
     model_config = SettingsConfigDict(
-        extra="ignore", env_ignore_empty=True, hide_input_in_errors=True
+        env_file=SETTINGS_FILES, extra="ignore", env_ignore_empty=True, hide_input_in_errors=True
     )
 
     server_port: int = 8030

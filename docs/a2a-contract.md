@@ -247,9 +247,9 @@ Every A2A call carries the contract's two credentials, and the card says so (see
 [Agent Card](#agent-card)):
 
 - `X-Caller-Secret: <secret>` proves which registered caller sends the request. Callers are
-  registered by the agent's operator in `allowed-callers.yaml` (`scripts/register-caller.sh`), each
-  with a name, the secret it presents and the Google OAuth client id whose tokens it forwards. The
-  secret is compared in constant time against every entry; a missing or unknown secret gets HTTP
+  registered by the agent's operator in `allowed-callers.yaml` (`scripts/tools/register-caller.sh`),
+  each with a name, the secret it presents and the Google OAuth client id whose tokens it forwards.
+  The secret is compared in constant time against every entry; a missing or unknown secret gets HTTP
   401 with `WWW-Authenticate: X-Caller-Secret` and an empty body, before any JSON-RPC handling.
 - `Authorization: Bearer <Google ID token>` says which person the call is for: the token the
   person received when signing in to the caller's own page with Google, forwarded as received. The

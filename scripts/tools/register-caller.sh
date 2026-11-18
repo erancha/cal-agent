@@ -2,30 +2,33 @@
 #
 # Register an A2A caller, or replace its entry: the secret it will present in X-Caller-Secret,
 # minted here and printed once, and the Google OAuth client whose ID tokens it forwards. Writes
-# allowed-callers.yaml beside .env (mode 600) in the shape the agent reads:
+# the gitignored allowed-callers.yaml at the repo root (mode 600) in the shape the agent reads:
 #
 #   callers:
 #     - name: <caller>
 #       shared_secret: <secret>
 #       client_id: <Google OAuth client id>
 #
-#   ./scripts/register-caller.sh --name <caller> --client-id <client id>   # mints the secret
-#   ./scripts/register-caller.sh ... --secret <secret>   # registers a given secret (tests)
-#   ./scripts/register-caller.sh ... --file <path>       # another file (A2A_CALLERS_FILE)
+#   ./scripts/tools/register-caller.sh --name <caller> --client-id <client id>   # mints the secret
+#   ./scripts/tools/register-caller.sh ... --secret <secret>   # registers a given secret (tests)
+#   ./scripts/tools/register-caller.sh ... --file <path>       # another file (A2A_CALLERS_FILE)
 #
-# The secret is shown once and never again, printed with this agent's name and URLs: the four
-# values the caller's operator records. start.sh repeats the public three once the agent is up. A
-# caller with that name is replaced; other callers are kept. Removing an entry revokes the caller;
-# the agent reads the file at startup, so restart a running one after a change.
+# The secret is shown once and never again, printed with this agent's name and URLs on this
+# machine: the four values the caller's operator records. deploy.sh repeats the public three once
+# the agent is up, with the CloudFront address for deploy.sh --ec2; the secret is the same on
+# both targets. A caller with that name is replaced; other callers are kept. Removing an entry
+# revokes the caller. The replicas receive the registry when they start, so run
+# ./scripts/deploy.sh (or deploy.sh --ec2) after a change; it recreates them.
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=common.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../common.sh
 source "$SCRIPT_DIR/common.sh"
-# .env is optional here: it only supplies the URLs the hand-over names, which otherwise default to
-# the agent's own.
-[ -f "$ROOT/.env" ] && load_env
+# The hand-over's URLs come from the committed stack parameters alone, so the tool runs before
+# the gitignored settings files exist.
+# shellcheck source=../lib/stack-params.sh
+source "$STACK_PARAMS_FILE"
 
-NAME="" SECRET="" CLIENT_ID="" FILE="$DEFAULT_CALLERS_FILE"
+NAME="" SECRET="" CLIENT_ID="" FILE="$(callers_file)"
 while [ $# -gt 0 ]; do
   case "$1" in
     --name)      NAME="${2:?--name needs a value}"; shift ;;
@@ -33,7 +36,8 @@ while [ $# -gt 0 ]; do
     --client-id) CLIENT_ID="${2:?--client-id needs a value}"; shift ;;
     --file)      FILE="${2:?--file needs a path}"; shift ;;
     -h|--help)   print_help; exit 0 ;;
-    *) echo "Usage: ./scripts/register-caller.sh --name N --client-id C [--secret S] [--file F]" >&2
+    *) echo "Usage: ./scripts/tools/register-caller.sh --name N --client-id C [--secret S]" \
+         "[--file F]" >&2
        exit 2 ;;
   esac
   shift
@@ -52,7 +56,6 @@ for value in "$NAME" "$SECRET" "$CLIENT_ID"; do
     || { echo "Values may contain only letters, digits, '_', '.' and '-'." >&2; exit 2; }
 done
 
-clear_callers_dir "$FILE"
 umask 077
 # The secret reaches Python through the environment, not the command line, so no process listing
 # shows it.
@@ -85,7 +88,7 @@ if os.path.exists(path):
 
 callers = [c for c in callers if c["name"] != name]
 callers.append({"name": name, "shared_secret": secret, "client_id": client_id})
-lines = ["# Registered A2A callers of this cal-agent; written by scripts/register-caller.sh.",
+lines = ["# Registered A2A callers of this cal-agent; written by scripts/tools/register-caller.sh.",
          "callers:"]
 for caller in callers:
     lines += [f"  - name: {caller['name']}",
@@ -105,4 +108,4 @@ else
   echo "Registered $NAME in $FILE with the given secret."
   print_handover "$NAME's operator" "the one given"
 fi
-echo "An agent already running reads the file at its next start."
+echo "Run ./scripts/deploy.sh (or deploy.sh --ec2) so the replicas receive the change."

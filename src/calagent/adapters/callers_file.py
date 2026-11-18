@@ -1,4 +1,4 @@
-"""Reads the registry of A2A callers that register-caller.sh writes.
+"""Reads the registry of A2A callers that scripts/tools/register-caller.sh writes.
 
 The file holds a callers list of {name, shared_secret, client_id} entries; callers are looked up
 by the secret they present. Names are unique because task ownership is keyed on them.
@@ -23,7 +23,7 @@ def load_callers(path: Path) -> dict[str, Caller]:
     if not path.is_file():
         raise FileNotFoundError(
             f"the callers file {path} does not exist; register a caller with "
-            "./scripts/register-caller.sh"
+            "./scripts/tools/register-caller.sh"
         )
     document = yaml.safe_load(path.read_text())
     if not isinstance(document, dict) or "callers" not in document:

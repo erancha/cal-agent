@@ -22,9 +22,8 @@ In particular:
 
 What a request needs therefore crosses processes: the person is a token verified on every request,
 every replica mounts the same statements folder, and every task, its events and its lease are kept
-in Redis. Without Redis, as in `start.sh --host` and the unit tests, all of it stays in the
-process's memory, for a single replica. What is still open under this term is tracked in this
-repo's GitHub issues: the `scalability` label with the `scaling-safety` label.
+in Redis. Without Redis, as in an agent started on the host and the unit tests, all of it stays in
+the process's memory, for a single replica.
 
 ### The task store and event stream
 
@@ -78,17 +77,16 @@ statements folder and task store, one thing carries this: a merchant costs one m
 person, whichever replica meets it first. The merchant memory ([categorizer.md](categorizer.md))
 is a Redis hash per person, `cal:merchants:<sub>`, kept without expiry, so a month fetched through
 any replica, or after any restart, is categorized as fast as through the one that saw its merchants
-first. What is still open under this term is tracked in this repo's GitHub issues: the
-`scalability` label with the `scaling-out` label.
+first.
 
 ## The edge service
 
-An nginx service, `edge`, is the only one that publishes port 8030, and it spreads calls over the
-replicas. It looks up the replicas' addresses again every 5 seconds, so a replica added by scaling
-or recreated by a redeploy starts receiving calls without an edge restart. It passes each response
-on as it arrives, so the stream's events reach the caller one by one, and waits up to 300 seconds
-for the next one, since a stream is silent while the model categorizes a month. It admits uploads
-up to 6 MB, so a file just over the agent's 5 MB limit reaches the agent's own refusal, which names
-the limit. Its access log names the replica that served each call
-(`docker-helper.sh --logs edge`). `start.sh --host` has no edge: the one process serves the port
-itself.
+An nginx service, `edge`, is the only one that publishes a port, 8030 as shipped, and it spreads
+calls over the replicas. It looks up the replicas' addresses again every 5 seconds, so a replica
+added by scaling or recreated by a redeploy starts receiving calls without an edge restart. It
+passes each response on as it arrives, so the stream's events reach the caller one by one, and waits
+up to 300 seconds for the next bytes; while the model categorizes a month the stream carries only
+the SDK's keep-alive comment, every 15 seconds. It admits uploads up to 6 MB, so a file just over
+the agent's 5 MB limit reaches the agent's own refusal, which names the limit. Its access log names
+the replica that served each call (`docker-helper.sh --logs edge`). An agent started on the host has
+no edge: the one process serves the port itself.

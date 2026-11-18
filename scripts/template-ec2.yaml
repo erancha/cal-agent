@@ -1,0 +1,245 @@
+# A Docker Compose stack on an EC2 instance, behind the CloudFront distribution that gives it an
+# HTTPS address. The same file in every Docker Compose repo; scripts/deploy.sh --ec2 deploys it
+# and passes every parameter, and scripts/lib/ec2.sh holds the lookups.
+#
+# Several stacks share one instance. The host stack, deployed with HostStack blank, owns the
+# instance, its fixed address and its security group, which admits CloudFront to its own port and
+# SSH from the deployer only. It also offers four empty security groups attached to the instance,
+# slots that name no guest. A guest stack names the host in HostStack and a free slot in
+# SlotGroupId (scripts/lib/ec2.sh picks it): it opens its own port to CloudFront in that slot and
+# points its distribution at the host's address. A rule admitting CloudFront's servers counts as
+# 55 of a group's 60, so each stack's rule needs a group of its own. CloudFormation refuses to
+# delete a host stack while a guest imports its exports.
+#
+# The instance is replaced, with a new empty disk, when ImageId or SubnetId changes, so deploy.sh
+# passes them only when it creates a host stack. A change of InstanceType or UserData stops and
+# starts the same instance and keeps its disk and address; UserData runs on the first boot only.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: A Docker Compose stack on an EC2 instance behind CloudFront
+
+# The host-only parameters are plain strings that a guest leaves blank, so cfn-lint cannot hold
+# them to the formats of an image, VPC, subnet or address range.
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks: [W2506, W1030]
+
+Parameters:
+  HostStack:
+    Type: String
+    Default: ''
+    Description: The host stack whose instance runs this stack; blank for the host stack itself
+  ImageId:
+    Type: String
+    Default: ''
+    Description: Host only - Amazon Linux 2023 image for the instance's architecture
+  InstanceType:
+    Type: String
+    Default: t4g.small
+    Description: Host only - an ARM instance type; the images are built for linux/arm64
+  DiskSizeGb:
+    Type: Number
+    Default: 10
+    Description: Host only - size of the instance's one disk, for the images and Docker volumes
+  VpcId:
+    Type: String
+    Default: ''
+    Description: Host only - the VPC of the security group
+  SubnetId:
+    Type: String
+    Default: ''
+    Description: Host only - a public subnet whose availability zone offers InstanceType
+  OriginPort:
+    Type: Number
+    Description: The port this stack is published on, CloudFront's origin port (EC2_ORIGIN_PORT)
+  SshCidr:
+    Type: String
+    Default: ''
+    Description: Host only - the one address range that may reach port 22, the deployer's own
+  CloudFrontPrefixListId:
+    Type: String
+    Description: Id of the region's com.amazonaws.global.cloudfront.origin-facing prefix list
+  SlotGroupId:
+    Type: String
+    Default: ''
+    Description: Guest only - the host's free slot, a security group this stack opens its port in
+
+Conditions:
+  IsHost: !Equals [!Ref HostStack, '']
+  IsGuest: !Not [!Condition IsHost]
+  IsUsEast1: !Equals [!Ref 'AWS::Region', us-east-1]
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: IsHost
+    Properties:
+      GroupDescription: Agent port from CloudFront only; SSH from the deployer only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: CloudFront edge servers to the agent port
+          IpProtocol: tcp
+          FromPort: !Ref OriginPort
+          ToPort: !Ref OriginPort
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+        - Description: SSH with an EC2 Instance Connect key, from the deployer address only
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SshCidr
+
+  # Empty groups on the instance, each held by at most one guest's rule; a deleted guest's rule
+  # goes with its stack and frees the slot.
+  Slot1:
+    Type: AWS::EC2::SecurityGroup
+    Condition: IsHost
+    Properties:
+      GroupDescription: A slot a guest stack of this instance opens its port in
+      VpcId: !Ref VpcId
+  Slot2:
+    Type: AWS::EC2::SecurityGroup
+    Condition: IsHost
+    Properties:
+      GroupDescription: A slot a guest stack of this instance opens its port in
+      VpcId: !Ref VpcId
+  Slot3:
+    Type: AWS::EC2::SecurityGroup
+    Condition: IsHost
+    Properties:
+      GroupDescription: A slot a guest stack of this instance opens its port in
+      VpcId: !Ref VpcId
+  Slot4:
+    Type: AWS::EC2::SecurityGroup
+    Condition: IsHost
+    Properties:
+      GroupDescription: A slot a guest stack of this instance opens its port in
+      VpcId: !Ref VpcId
+
+  # A guest's own port in the slot it claimed, open to CloudFront only, like the host's.
+  GuestIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: IsGuest
+    Properties:
+      GroupId: !Ref SlotGroupId
+      Description: !Sub 'CloudFront edge servers to the port of ${AWS::StackName}'
+      IpProtocol: tcp
+      FromPort: !Ref OriginPort
+      ToPort: !Ref OriginPort
+      SourcePrefixListId: !Ref CloudFrontPrefixListId
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Condition: IsHost
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref SecurityGroup, !Ref Slot1, !Ref Slot2, !Ref Slot3, !Ref Slot4]
+      BlockDeviceMappings:
+        # The disk outlives the instance, since it holds the database: a terminated instance
+        # leaves its volume in the account.
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: !Ref DiskSizeGb
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: false
+      # Only the Docker engine: Compose runs on the deployer's machine against this daemon.
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -euo pipefail
+          dnf install -y docker
+          systemctl enable --now docker
+          usermod -aG docker ec2-user
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+
+  # A fixed address, so CloudFront's origin survives a stop and start of the instance.
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Condition: IsHost
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+
+  ElasticIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Condition: IsHost
+    Properties:
+      AllocationId: !GetAtt ElasticIp.AllocationId
+      InstanceId: !Ref Instance
+
+  # TLS ends at CloudFront; the hop to the instance is plain HTTP on this stack's port.
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Ref 'AWS::StackName'
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: agent
+            # The public DNS name of the host's Elastic IP; CloudFront takes no bare IP address.
+            DomainName: !Join
+              - ''
+              - - ec2-
+                - !Join ['-', !Split ['.', !If [IsHost, !GetAtt ElasticIp.PublicIp, !ImportValue {
+                    'Fn::Sub': '${HostStack}-PublicAddress'}]]]
+                - !If
+                  - IsUsEast1
+                  - .compute-1.amazonaws.com
+                  - !Sub '.${AWS::Region}.compute.amazonaws.com'
+            CustomOriginConfig:
+              OriginProtocolPolicy: http-only
+              HTTPPort: !Ref OriginPort
+        # The page's index, the API, the event stream and the health routes always come from the
+        # agent, with every viewer header, cookie and query string: sign-in rides on a cookie and
+        # the event stream on the Last-Event-ID header.
+        DefaultCacheBehavior:
+          TargetOriginId: agent
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          # The managed policies CachingDisabled and AllViewer.
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+        CacheBehaviors:
+          # The build's script and stylesheet carry a content hash in their names, so the edge
+          # may keep them: the managed policy CachingOptimized.
+          - PathPattern: /assets/*
+            TargetOriginId: agent
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+
+# The host's outputs are exports, which its guests import; scripts/lib/ec2.sh reads a guest's
+# instance from its host stack.
+Outputs:
+  InstanceId:
+    Condition: IsHost
+    Value: !Ref Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+  PublicAddress:
+    Condition: IsHost
+    Description: The instance's fixed public address
+    Value: !GetAtt ElasticIp.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicAddress'
+  SecurityGroupId:
+    Condition: IsHost
+    Value: !Ref SecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+  SlotGroupIds:
+    Condition: IsHost
+    Description: The slots guests open their ports in, comma separated
+    Value: !Join [',', [!Ref Slot1, !Ref Slot2, !Ref Slot3, !Ref Slot4]]
+  CloudFrontUrl:
+    Description: The address people open, and the origin to register with Google
+    Value: !Sub 'https://${Distribution.DomainName}'

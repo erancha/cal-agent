@@ -1,3 +1,12 @@
+# cal-agent's services: Redis, the agent's replicas and the nginx edge in front of them. The
+# scripts call compose from this directory, so relative paths resolve from the repo root.
+# Settings come from the files under scripts/lib/ (stack-params.sh, params.sh, secrets.sh), which
+# the scripts export into their shell before calling compose, so the ${...} values below
+# interpolate; a bare docker compose call has none of them. Only the edge publishes a port, on
+# this machine's loopback interface, where a caller in Docker on this machine also reaches it,
+# through host.docker.internal.
+name: cal-agent
+
 services:
   # Holds the A2A tasks for every replica (TASKS_REDIS_URL), so whichever replica receives a
   # continue finds the task another replica paused, together with each task's events, the lease
@@ -16,43 +25,67 @@ services:
       timeout: 3s
       retries: 15
 
-  # The card agent, reading statements from the folder named in .env (STATEMENTS_DIR), one
+  # The card agent, reading statements from the STATEMENTS_DIR folder of stack-params.sh, one
   # sub-folder per person. The statements page writes uploads into that folder, so the mount is
-  # writable and the process runs as the host user who owns it (scripts/common.sh exports HOST_UID
-  # and HOST_GID). The registered callers come from the file register-caller.sh writes, mounted
-  # read-only; it must exist before the first start.
+  # writable and the process runs as the host user who owns it (the compose function of
+  # scripts/common.sh exports HOST_UID and HOST_GID).
   cal-agent:
     build: .
     image: cal-agent:local
-    user: "${HOST_UID:?run through scripts/start.sh}:${HOST_GID:?run through scripts/start.sh}"
+    user: "${HOST_UID:?set by scripts/common.sh}:${HOST_GID:?set by scripts/common.sh}"
     # The edge spreads requests over the replicas, and whichever replica receives a continue picks
     # up the paused task. Redeploy only while no task is working: stopping a replica mid-task ends
     # that task's stream, and the caller's fetch fails.
     # To try a different number of replicas, scale the running stack: in a shell, source
-    # scripts/common.sh and run load_env (compose needs the variables it exports), then run
-    # compose up -d --scale cal-agent=N --wait. The next start.sh goes back to the count set here.
+    # scripts/common.sh, then run compose up -d --scale cal-agent=N --wait (the compose function
+    # loads the settings it needs). The next deploy.sh goes back to the count set here.
     deploy:
       replicas: 2
       resources:
         limits:
           memory: 512M
-    env_file:
-      - path: ./.env
-        required: true
-    # The container always listens on 8030; SERVER_PORT from .env only chooses the host port the
-    # edge publishes.
+    # Each replica receives only the settings it reads. A key listed without a value takes its
+    # value from the scripts' shell and stays unset when its settings file leaves it commented
+    # out, so the agent keeps its default. The image sets STATIC_DIR to its own copy of the page.
     environment:
+      # The container always listens on 8030; EDGE_HOST_PORT of stack-params.sh only chooses the
+      # port the edge is published on.
       SERVER_PORT: 8030
+      AGENT_URL:
+      # The paths inside the container, replacing the host forms of stack-params.sh.
       STATEMENTS_DIR: /statements
       A2A_CALLERS_FILE: /allowed-callers.yaml
+      A2A_AUTH_REQUIRED:
+      AUTH_CLIENT_ID:
+      AUTH_ISSUER:
+      AUTH_JWKS_URL:
+      AUTH_PUBLIC_KEY_FILE:
+      LLM_MODEL:
+      LLM_API_KEY:
+      CATEGORIZER_HIGH_CONFIDENCE:
+      CATEGORIZER_MEDIUM_CONFIDENCE:
+      CATEGORIZER_BATCH_SIZE:
       # The replicas share their tasks through Redis. To keep tasks in the process's memory
       # instead, blank this value and also set replicas to 1 above: with several replicas, a
       # continue reaching a replica other than the one that paused the task would find no task.
-      # start.sh --host already runs this way, as one process with its tasks in memory.
+      # An agent started on the host runs this way, as one process with its tasks in memory.
       TASKS_REDIS_URL: redis://redis:6379/0
+      TASKS_TTL:
+      TASK_LEASE_SECONDS:
+      A2A_EXECUTOR:
+      CAL_TEST_SLOW_MS:
+      LOG_LEVEL:
+      A2A_LOG_LEVEL:
+    # The registered callers, copied into the container when it is created (the compose function
+    # of scripts/common.sh exports the registry's content). The digest of that content is a
+    # label, so a changed registry recreates the replicas on the next deploy.
+    secrets:
+      - source: allowed-callers
+        target: /allowed-callers.yaml
+    labels:
+      cal-agent.callers-digest: "${A2A_CALLERS_DIGEST:?set by scripts/common.sh}"
     volumes:
-      - ${STATEMENTS_DIR:?set STATEMENTS_DIR in .env}:/statements
-      - ${A2A_CALLERS_FILE:-./allowed-callers.yaml}:/allowed-callers.yaml:ro
+      - ${STATEMENTS_DIR:?set in stack-params.sh}:/statements
     healthcheck:
       test:
         - CMD
@@ -66,14 +99,14 @@ services:
       redis:
         condition: service_healthy
 
-  # The only service that publishes the agent's port; nginx/default.conf proxies to the replicas.
+  # The only service that publishes the agent's port; nginx/default.conf, baked into the image,
+  # proxies to the replicas.
   edge:
-    image: nginx:1.28-alpine
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    build: nginx
+    image: cal-agent-edge:local
     deploy: { resources: { limits: { memory: 64M } } }
     ports:
-      - "${SERVER_PORT:-8030}:8030"
+      - "127.0.0.1:${EDGE_HOST_PORT:?set in stack-params.sh}:8030"
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8030/health"]
       interval: 3s
@@ -82,6 +115,10 @@ services:
     depends_on:
       cal-agent:
         condition: service_healthy
+
+secrets:
+  allowed-callers:
+    environment: A2A_CALLERS_YAML
 
 volumes:
   cal_redis:

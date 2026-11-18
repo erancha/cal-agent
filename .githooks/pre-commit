@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Refuses a commit that stages a secrets file (SECRETS_FILES of scripts/lib/settings-guard.sh) or
+# any value one of them holds, or a private settings file (PRIVATE_FILES) or an email address one
+# of them holds that PUBLISHED_SETTINGS does not name. Enabled by core.hooksPath=.githooks, which
+# source_checked_file of scripts/lib/settings-guard.sh sets whenever a script loads such a file.
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+# shellcheck source=../scripts/lib/settings-guard.sh
+source "$ROOT/scripts/lib/settings-guard.sh"
+
+# Runs <check> on the staged snapshot for each file that exists.
+check_staged() {  # check file...
+  local check="$1" file
+  shift
+  for file in "$@"; do
+    # A checkout without the file holds none of its values.
+    [[ -f "$file" ]] || continue
+    "$check" "$file" index
+  done
+}
+
+(( ${#SECRETS_FILES[@]} > 0 )) || die "settings-guard.sh lists no secrets files to check"
+check_staged assert_secrets_untracked "${SECRETS_FILES[@]}"
+check_staged assert_addresses_untracked "${PRIVATE_FILES[@]}"

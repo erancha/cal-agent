@@ -1,22 +1,37 @@
 __pycache__/
 *.py[cod]
 .venv/
-.env
-.env.*
-!.env.example
-allowed-callers.yaml
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.claude/
-CLAUDE.local.md
-
-# The person's real statements and the anonymization mapping never enter the repo.
-/statements/
-*.real.pdf
-anonymize-*.json
-
-# Output of validate.sh and the conformance suite checkout.
+.import_linter_cache/
+# The run folder of scripts/tools/validate.sh and its checkout of the conformance suite.
 /.validate/
 /.tck/
+
+.env
+.env.*
+# The settings files init-env.sh creates from their committed .example.sh files.
+/scripts/lib/secrets.sh
+/scripts/lib/params.sh
+/scripts/lib/aws-config.sh
+# The throwaway Instance Connect key pair and the socket of the EC2 instance's Docker daemon.
+/scripts/lib/.ssh/
+# The registered A2A callers and their secrets, written by scripts/tools/register-caller.sh.
+allowed-callers.yaml
+
+docs/superpowers/*
+.superpowers/
+.claude/*
+!.claude/skills/
+CLAUDE.local.md
+
+# The person's real statements, which the statements page loads into this folder.
+/statements/
+# A real statement kept beside the tests while anonymizing it.
+*.real.pdf
+# The anonymizer's mapping of private words to stand-ins, which holds the private words.
+anonymize-*.json
+# Local copies of a previous .env, kept for reference.
+backup/

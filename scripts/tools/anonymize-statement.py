@@ -18,7 +18,7 @@ stand-in has the key's length and spaces. It holds the private values, so it sta
 repo. The run fails when a key is never found, when a stand-in needs a character the embedded
 font subset lacks, or when any key still appears in the written file.
 
-Usage: scripts/anonymize-statement.py <in.pdf> <out.pdf> <replacements.json>
+Usage: scripts/tools/anonymize-statement.py <in.pdf> <out.pdf> <replacements.json>
 Requires pypdf.
 """
 

@@ -14,6 +14,9 @@ COPY src /build/src
 RUN pip install --no-cache-dir --no-deps /build && rm -rf /build
 COPY static ./static
 ENV STATIC_DIR=/app/static
+# A named volume mounted here starts as a copy of this folder, so on the EC2 instance the
+# statements volume belongs to the agent user, who writes the uploads into it.
+RUN install -d -o agent -g agent /statements
 USER agent
 EXPOSE 8030
 CMD ["uvicorn", "calagent.platform.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8030"]

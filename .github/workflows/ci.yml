@@ -16,4 +16,4 @@ jobs:
       - name: Checks, unit and integration tests, shell tests
         run: bash scripts/test.sh all
       - name: Client-side validation
-        run: bash scripts/validate.sh
+        run: bash scripts/tools/validate.sh

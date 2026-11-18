@@ -3,6 +3,10 @@
 What happens inside one replica between a caller's request for a month and the last row it
 receives, and why the agent is built that way.
 
+**Contents:** [The SDK's routes](#the-sdks-routes) · [Who is calling](#who-is-calling) ·
+[Admission before the task starts](#admission-before-the-task-starts) ·
+[The executor](#the-executor)
+
 ```mermaid
 sequenceDiagram
   participant C as A2A client
@@ -11,7 +15,7 @@ sequenceDiagram
   participant X as Executor
   participant F as Statement folder
   participant M as Categorizer
-  participant L as LLM (Language Model)
+  participant L as LLM (Large Language Model)
   participant S as Task store and events
 
   C->>W: SendStreamingMessage {"month": "2026-10"}<br/>Bearer ID token, X-Caller-Secret

@@ -65,7 +65,7 @@ def appears(word: str, text: str) -> bool:
 
 
 def load_anonymizer() -> ModuleType:
-    path = Path(__file__).parents[2] / "scripts" / "anonymize-statement.py"
+    path = Path(__file__).parents[2] / "scripts" / "tools" / "anonymize-statement.py"
     spec = importlib.util.spec_from_file_location("anonymize_statement", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

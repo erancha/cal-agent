@@ -1,0 +1,24 @@
+Required Notice: Copyright Eran Hachmon (https://github.com/erancha)
+
+cal-agent is licensed under the PolyForm Noncommercial License 1.0.0 (see LICENSE). The
+permission below is granted additionally by the copyright holder. It widens that license and
+alters nothing else in it.
+
+# Additional permission: evaluation and private deployment
+
+Any person or organization, including a for-profit company, may read, copy and modify this
+software, and run it in a private deployment, in order to evaluate the software or its author, or
+for their own personal use.
+
+A private deployment is one whose users are the operator and people the operator invites, that is
+not offered to the public, and for which no fee is charged. A prospective employer reading the
+source and standing up a private instance to watch it run is the case this permission is written
+for.
+
+# Commercial licensing
+
+Commercial use is not granted by the license or by the permission above. Offering this software,
+or a product or service derived from it, to customers or to the public as part of a business
+requires a separate commercial license from the copyright holder.
+
+To obtain one, write to erancha@gmail.com.

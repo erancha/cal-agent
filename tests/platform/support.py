@@ -77,7 +77,8 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "agent_url": AGENT_URL,
         "tasks_redis_url": None,
     }
-    return Settings(**(values | overrides))
+    # The settings files of this checkout stay out, so a test sees only the values it gives.
+    return Settings(_env_file=None, **(values | overrides))
 
 
 def make_app(

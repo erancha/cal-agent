@@ -1,0 +1,38 @@
+# What changes when the stack runs on the EC2 instance of loan-simulator's stack;
+# scripts/deploy.sh --ec2 passes this file after docker-compose.yml. The images are built on the
+# deployer's machine for the instance's ARM processor, under their own tags so the local stack's
+# images stay as they are. The edge keeps its port on the instance's address, where the security
+# group admits only CloudFront, and callers in Docker on the instance reach it through
+# host.docker.internal; Redis and the replicas publish nothing. The services start again after
+# the instance stops and starts.
+services:
+  redis:
+    restart: unless-stopped
+
+  cal-agent:
+    image: cal-agent:ec2
+    platform: linux/arm64
+    restart: unless-stopped
+    # The image's own agent user, which owns the statements volume; no user of this machine
+    # exists on the instance.
+    user: !reset null
+    # The card advertises the stack's CloudFront address, the one callers outside the instance
+    # reach.
+    environment:
+      AGENT_URL: "${EC2_URL:?set by scripts/lib/ec2.sh}"
+    # The statements stay on the instance's disk, loaded through the statements page; a folder of
+    # this machine cannot be mounted on the instance.
+    volumes: !override
+      - cal_statements:/statements
+
+  # Published on the instance's address, where the security group admits only CloudFront and
+  # home-finance-agent's containers reach it at host.docker.internal.
+  edge:
+    image: cal-agent-edge:ec2
+    platform: linux/arm64
+    restart: unless-stopped
+    ports: !override
+      - "${EC2_ORIGIN_PORT:?set in stack-params.sh}:8030"
+
+volumes:
+  cal_statements:

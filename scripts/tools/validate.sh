@@ -11,16 +11,18 @@
 # provider's HTTP client is built at startup, so a runtime library missing from the dependency
 # pins fails here rather than on the first real deployment.
 #
-#   ./scripts/validate.sh          # the client-side checks above
-#   ./scripts/validate.sh --tck    # additionally run the official A2A TCK (MUST level, JSON-RPC)
+#   ./scripts/tools/validate.sh          # the client-side checks above
+#   ./scripts/tools/validate.sh --tck    # also run the official A2A TCK (MUST level, JSON-RPC)
 #
 # --tck clones or updates github.com/a2aproject/a2a-tck under .tck/, starts a second agent with
 # A2A_EXECUTOR=tck (scenario executor, auth off) and fails on any MUST failure. It needs network
 # access for the first run. Everything else needs Python 3.14+ and openssl. Nothing is left
-# running; the run's files live under .validate/ and .tck/, both ignored by git.
+# running; the run's files live under .validate/ and .tck/, both ignored by git. The agent runs
+# in .validate/, where it finds none of the settings files under scripts/lib/, so only the values
+# set here configure it.
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=common.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../common.sh
 source "$SCRIPT_DIR/common.sh"
 
 TCK=0
@@ -28,9 +30,23 @@ for arg in "$@"; do
   case "$arg" in
     --tck)     TCK=1 ;;
     -h|--help) print_help; exit 0 ;;
-    *) echo "Usage: ./scripts/validate.sh [--tck]" >&2; exit 2 ;;
+    *) echo "Usage: ./scripts/tools/validate.sh [--tck]" >&2; exit 2 ;;
   esac
 done
+
+is_healthy() { curl -fs --max-time 2 -o /dev/null "$1/health"; }  # base-url
+
+# Polls the health endpoint until it answers or 60 seconds pass, and fails as soon as the given
+# process exits, so a dead launch is reported at once instead of after the full wait.
+wait_for_health() {  # base-url pid
+  local attempt
+  for attempt in $(seq 60); do
+    is_healthy "$1" && return 0
+    kill -0 "$2" 2>/dev/null || return 1
+    sleep 1
+  done
+  return 1
+}
 
 ensure_venv
 PORT=8031
@@ -48,7 +64,7 @@ ISSUER=validate
 PAGE_CLIENT_ID=validate-page
 CALLER_CLIENT_ID=validate-caller
 CALLER_SECRET="validate-$(date +%s)"
-"$SCRIPT_DIR/register-caller.sh" --name validate --secret "$CALLER_SECRET" \
+"$SCRIPT_DIR/tools/register-caller.sh" --name validate --secret "$CALLER_SECRET" \
   --client-id "$CALLER_CLIENT_ID" --file "$WORK/allowed-callers.yaml" >/dev/null
 
 pids=()
@@ -68,9 +84,9 @@ run_agent() {  # port model [executor]
     echo "port $1 already serves an agent; stop it first (lsof -ti tcp:$1 | xargs kill)" >&2
     exit 1
   fi
-  (cd "$ROOT" && exec env -u TASKS_REDIS_URL -u CAL_TEST_SLOW_MS -u A2A_AUTH_REQUIRED \
+  (cd "$WORK" && exec env -u TASKS_REDIS_URL -u CAL_TEST_SLOW_MS -u A2A_AUTH_REQUIRED \
     SERVER_PORT="$1" AGENT_URL="$url" LLM_MODEL="$2" LLM_API_KEY=placeholder \
-    A2A_EXECUTOR="${3:-card}" STATEMENTS_DIR="$WORK/statements" \
+    A2A_EXECUTOR="${3:-card}" STATEMENTS_DIR="$WORK/statements" STATIC_DIR="$ROOT/static" \
     AUTH_CLIENT_ID="$PAGE_CLIENT_ID" AUTH_ISSUER="$ISSUER" \
     AUTH_PUBLIC_KEY_FILE="$WORK/public.pem" A2A_CALLERS_FILE="$callers" \
     LOG_LEVEL=WARNING "$VENV/bin/uvicorn" calagent.platform.app:create_app --factory \
@@ -89,7 +105,7 @@ stop_last_agent() {
 
 run_agent "$PORT" keyword
 echo "==> client-side checks against $BASE"
-"$VENV/bin/python" "$SCRIPT_DIR/validate/check_agent.py" "$BASE" \
+"$VENV/bin/python" "$SCRIPT_DIR/tools/validate/check_agent.py" "$BASE" \
   --private-key "$WORK/private.pem" --issuer "$ISSUER" --caller-secret "$CALLER_SECRET" \
   --caller-client-id "$CALLER_CLIENT_ID" --page-client-id "$PAGE_CLIENT_ID" \
   --covered 2026-10 --count 19 --uncovered 2026-09

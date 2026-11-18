@@ -2,10 +2,11 @@
 
 Four layers, each proving something the others cannot. Unit tests pin the rules of parsing,
 categorizing, sign-in and the task, with the agent's app called in process through the A2A SDK's
-client. Integration tests run the Redis adapters on a real Redis, and two agent processes sharing
-it as replicas. `validate.sh` starts the agent as an operator would and proves it from the client
+client. Integration tests run the Redis adapters on a real Redis, and two agent processes sharing it
+as replicas. `tools/validate.sh` starts the agent as an operator would and proves it from the client
 side, check by check. The official A2A conformance suite checks the protocol itself. None needs a
 model API key, and none reaches Google: the tests sign their own tokens with a key they generate.
+This page details the tests behind [Development & deployment](development.md#backend-tests).
 
 **Contents:** [Running](#running) · [Unit](#unit) · [Integration](#integration) ·
 [Client-side validation](#client-side-validation) · [Conformance](#conformance) · [CI](#ci)
@@ -14,10 +15,10 @@ model API key, and none reaches Google: the tests sign their own tokens with a k
 
 | Command | Runs | Needs |
 |---|---|---|
-| `./scripts/test.sh unit` | Lint (ruff), types (mypy), layer contracts (lint-imports), unit tests, the operator scripts' tests | Python 3.14 |
+| `./scripts/test.sh unit` | The scripts' syntax (bash -n), lint (ruff), types (mypy), layer contracts (lint-imports), unit tests, the operator scripts' tests | Python 3.14 |
 | `./scripts/test.sh` (or `it`, `all`) | The above with the integration tests | Python 3.14, Docker for Redis |
-| `./scripts/validate.sh` | The agent proved from the client side | Python 3.14, openssl |
-| `./scripts/validate.sh --tck` | The above, then the A2A conformance suite | as above, plus network to fetch the suite |
+| `./scripts/tools/validate.sh` | The agent proved from the client side | Python 3.14, openssl |
+| `./scripts/tools/validate.sh --tck` | The above, then the A2A conformance suite | as above, plus network to fetch the suite |
 
 Every script builds `.venv` itself on first use, with the runtime dependencies at the exact pins the
 image installs.
@@ -65,12 +66,18 @@ Tests mirror the package's layout under `tests/`. What the unit layer pins, by a
   Every request, batch and pause validates against the contract's pinned JSON Schemas.
 - **Startup.** Each wrong required setting fails naming the variable, without printing the model
   key, and so do a lease period or batch size below one and confidence thresholds out of order; the
-  conformance executor forces auth off and refuses a shared Redis or a callers file; `.env.example`
-  documents every setting, and only the edge publishes a port. The sweep retries a pass that cannot
-  reach Redis and stops on any other error, and `/health` then answers `DOWN`.
-- **Operator scripts.** `scripts/tests/*.sh` check the hand-over lines, `.env` loading, caller
-  registration, the callers-file guard, the statements root `start.sh` creates and
-  `docker-helper.sh`'s refusals.
+  conformance executor forces auth off and refuses a shared Redis or a callers file; the settings
+  files under `scripts/lib/` document every setting and nothing else, no secret among the committed
+  ones, and unfilled copies of the examples do not start the agent. The sweep retries a pass that
+  cannot reach Redis and stops on any other error, and `/health` then answers `DOWN`.
+- **The Compose files.** Only the edge publishes a port; each replica receives exactly the keys the
+  agent reads and the callers registry as copied-in content, never a bind mount; on the EC2
+  instance every image built here carries the `:ec2` tag for ARM, every service restarts with the
+  instance, and the statements live in a volume.
+- **Operator scripts.** `scripts/tests/*.sh` check the hand-over lines, caller registration, the
+  callers-registry guard, the statements root `deploy.sh` creates and `docker-helper.sh`'s
+  refusals; `tests/test_settings_files.py` checks that `init-env.sh` creates owner-only copies of
+  the examples.
 
 ## Integration
 
@@ -92,11 +99,11 @@ These start Redis in Docker through Testcontainers.
 
 ## Client-side validation
 
-`validate.sh` starts the agent on port 8031 with `LLM_MODEL=keyword`, a throwaway signing key
+`tools/validate.sh` starts the agent on port 8031 with `LLM_MODEL=keyword`, a throwaway signing key
 standing in for Google, the test statement in person `1000`'s folder and a caller registered by
-`register-caller.sh`, and drives it with `scripts/validate/check_agent.py`, a client on the A2A
-SDK playing that caller. It prints one `PASS` line per check, 19 in all, and stops at the first
-failure:
+`tools/register-caller.sh`, and drives it with `scripts/tools/validate/check_agent.py`, a client on
+the A2A SDK playing that caller. It prints one `PASS` line per check, 19 in all, and stops at the
+first failure:
 
 1. The card advertises `monthly-transactions`,
 2. streaming,
@@ -125,16 +132,17 @@ run.
 
 ## Conformance
 
-`./scripts/validate.sh --tck` also runs the official
+`./scripts/tools/validate.sh --tck` also runs the official
 [A2A conformance suite (TCK)](https://github.com/a2aproject/a2a-tck) against a second agent on port
 8032, over JSON-RPC, at the MUST level: the requirements mandatory for conformance. The suite sends
 scripted messages and expects scripted answers no card agent would give, and sends no credentials,
 so this agent runs with `A2A_EXECUTOR=tck`, auth off and a scenario executor in place of the
-card's. The suite therefore proves the protocol; the tests and `validate.sh` prove the card work.
+card's. The suite therefore proves the protocol; the tests and `tools/validate.sh` prove the card
+work.
 The script fetches the suite into `.tck/` and leaves its reports in `.tck/reports/`.
 
 ## CI
 
 `.github/workflows/ci.yml` runs on every push and pull request: `scripts/test.sh all`, which
-includes the operator scripts' tests, then `validate.sh`. CI calls the same scripts developers run,
-so the two cannot drift. The conformance suite runs locally through `validate.sh --tck`.
+includes the operator scripts' tests, then `tools/validate.sh`. CI calls the same scripts developers
+run, so the two cannot drift. The conformance suite runs locally through `tools/validate.sh --tck`.

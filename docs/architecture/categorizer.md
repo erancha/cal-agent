@@ -3,6 +3,9 @@
 How each row gets a category from the shared taxonomy and a confidence, `high`, `medium` or `low`.
 Amounts and dates never pass through a model; only the category and the display name do.
 
+**Contents:** [Merchants, not rows](#merchants-not-rows) ·
+[The merchant memory](#the-merchant-memory) · [The prompt](#the-prompt) · [Providers](#providers)
+
 ## Merchants, not rows
 
 A month repeats merchants, and a merchant's category does not change between rows, so the agent

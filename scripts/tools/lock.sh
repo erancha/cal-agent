@@ -2,7 +2,7 @@
 #
 # Recompile requirements.txt, the exact pins the image installs, from pyproject.toml.
 #
-#   ./scripts/lock.sh
+#   ./scripts/tools/lock.sh
 #
 # pip-compile resolves the markers of the Python it runs on, so the lock is compiled inside the
 # same python image the Dockerfile builds on, whatever Python this machine has. The container runs
@@ -10,8 +10,8 @@
 # because the test venv takes the lock as a pip constraints file, which admits no extras. Run it
 # after editing the dependency list.
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=common.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../common.sh
 source "$SCRIPT_DIR/common.sh"
 
 case "${1:-}" in -h|--help) print_help; exit 0 ;; "") ;; *) print_help >&2; exit 2 ;; esac

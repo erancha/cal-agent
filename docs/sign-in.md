@@ -5,6 +5,36 @@ person in with the agent's own Google OAuth client, and every A2A call forwards 
 ID token issued to the registered caller's client. How the agent checks both is in
 [request-flow.md](architecture/request-flow.md#who-is-calling); this page sets up the Google side.
 
+## How it works
+
+```mermaid
+sequenceDiagram
+    actor P as Person
+    participant G as Google
+    participant S as Statements page
+    participant C as Registered caller
+    participant A as cal-agent
+    P->>S: Sign in with Google
+    S->>G: Sign-in button, this agent's client
+    G-->>S: ID token, audience = AUTH_CLIENT_ID
+    S->>A: Statements API, Authorization: Bearer token
+    A->>A: Verify signature, issuer, expiry, audience
+    P->>C: Signs in to the caller's own client
+    C->>A: A2A call: X-Caller-Secret + the person's token
+    A->>A: Secret matches a registered caller;<br/>token audience = that caller's client id
+```
+
+- **The statements page** signs a person in with the Sign in with Google button of this agent's
+  own client. The button hands the ID token to the page, which sends it as a bearer token with
+  every call to the statements API; the agent accepts only tokens whose audience is
+  `AUTH_CLIENT_ID`. A person sees only the folder of their own Google account id.
+- **An A2A call** carries two credentials: the caller's shared secret, matched against the
+  entries of the gitignored `allowed-callers.yaml`, and the person's token, issued to that caller's
+  own client and accepted only when its audience is the client id registered with the caller.
+- **The agent verifies every token locally**, against Google's published keys, the issuer and the
+  expiry. No session is kept server side; a refused A2A call pauses the task until the person
+  signs in again ([request-flow.md](architecture/request-flow.md#who-is-calling)).
+
 ## Setting up Google
 
 Give cal-agent its own Google Cloud project with one OAuth client, apart from any caller's. Each
@@ -32,8 +62,22 @@ here.
    a client secret and a JSON download. Only the client id is needed; it stays listed on the
    Clients page. Ignore the secret and the download: the agent verifies tokens, it never redeems
    codes, so nothing in this repo has a place for the secret.
-5. **Give it to the agent.** Copy the client id into `AUTH_CLIENT_ID` in `.env`.
+5. **Give it to the agent.** Copy the client id into `AUTH_CLIENT_ID` in `scripts/lib/params.sh`,
+   which `./scripts/init-env.sh` creates.
+6. **Start the agent.** Run `./scripts/deploy.sh`, which starts it with the client id.
 
 Google accepts only `localhost` or a public hostname as an authorized origin, never a private
 address such as `10.0.0.23`, so the statements page signs a person in only where it is reached
 under one of those.
+
+A stack deployed with `./scripts/deploy.sh --ec2` is reached at its CloudFront address, which the
+script prints. Add `https://<id>.cloudfront.net` as a further authorized JavaScript origin of the
+same client; it still needs no redirect URI.
+
+## Who may sign in
+
+The list of test users on the OAuth app is the access list for the statements page: while an app
+is in testing mode, Google signs in nobody else and shows an "access blocked" page. There is no
+allow-list in the agent's code, so adding or removing a person is done in the console, under
+**Audience → Test users**. An A2A call is admitted for a registered caller only, and for the
+people that caller's own Google app signs in.

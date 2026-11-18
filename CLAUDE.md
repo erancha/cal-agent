@@ -1,38 +1,36 @@
 # CLAUDE.md
 
-A2A server for one skill, `monthly-transactions`, over Cal (כאל, Israel Credit Cards) PDF
-statements: Python 3.14, FastAPI and the official `a2a-sdk` 1.x server, its routes and request
-handler, with Redis shared by the replicas. README.md tells the story; `docs/a2a-contract.md`
-describes how this agent implements the skill's contract, which the caller's repo owns;
-`docs/architecture.md` and `docs/testing.md` hold the details. Do not change the artifact schema
-or the taxonomy: they are the contract's, not this agent's.
+cal-agent: an A2A server for one skill, `monthly-transactions`, over Cal (כאל, Israel Credit
+Cards) PDF statements, on Python 3.14, FastAPI and the official `a2a-sdk` 1.x server, with Redis
+shared by the replicas. Layout, layers and parts: docs/architecture.md; how this agent implements
+the skill's contract, which the caller's repo owns: docs/a2a-contract.md. Do not change the
+artifact schema or the taxonomy: they are the contract's, not this agent's.
 
-## Layout and the layer rule
+## Operations scripts (scripts/)
 
-Package `calagent` in `src`: `platform → application → ports → domain`; `adapters` import only
-`ports` and `domain`. `domain`, `ports` and `application` import no framework (a2a, fastapi,
-starlette, redis, pdfplumber, anthropic, openai, httpx, yaml, structlog, jwt). `lint-imports`
-enforces this from `pyproject.toml`. `platform/a2a` holds everything that touches the SDK.
+Every script sources `scripts/common.sh`, which exports the three settings files under
+`scripts/lib/` before it calls Compose: the committed `stack-params.sh`, and the gitignored
+`params.sh` and `secrets.sh`, each beside an `.example.sh` that documents its keys. A bare
+`docker compose` call therefore has no settings. `.githooks/pre-commit` refuses a commit that
+stages one of the gitignored files, a value of `secrets.sh`, or an address of `params.sh` other
+than the license contact (`PUBLISHED_SETTINGS` of `lib/settings-guard.sh`). The callers
+registry, `allowed-callers.yaml`, is gitignored and not checked by the hook.
 
-## Scripts (scripts/, each prints usage with --help)
-
-- `init-env.sh [--force]`: create `.env`; then set `AUTH_CLIENT_ID` and `LLM_API_KEY`.
-- `register-caller.sh --name N --client-id C [--secret S] [--file F]`: register or replace an A2A
-  caller in `allowed-callers.yaml` (gitignored); mints and prints the secret unless one is given.
-- `start.sh [--host]`: Docker (default: Redis, two replicas, nginx edge on :8030) or one uvicorn
-  process with everything in memory; stops before launching when access is required and no
-  callers file exists.
-- `docker-helper.sh --stop [--volumes] | --logs [-e] [service...] | --ps`.
-- `test.sh [unit|it|all]`: ruff, mypy, lint-imports, pytest, then the shell tests in
-  `scripts/tests/`; `all` (the default) and `it` include the integration tests, which need Docker.
-- `validate.sh [--tck]`: the agent on :8031 with `LLM_MODEL=keyword` and a throwaway key in place
-  of Google, proved by `scripts/validate/check_agent.py` (19 checks), then one boot per real
-  provider on :8033; `--tck` runs the official A2A TCK on :8032 under `A2A_EXECUTOR=tck`.
-- `lock.sh`: recompile `requirements.txt` inside the Dockerfile's Python image after editing the
-  dependency list; the test venv installs under its pins.
-
-## Facts that bite
-
+- Compose hands each replica only the keys the agent reads, listed once in `docker-compose.yml`,
+  and replaces the host forms of `STATEMENTS_DIR` and `A2A_CALLERS_FILE` with the container's
+  paths. Host commands (pytest, uvicorn) run from the repo root, because the agent reads the
+  settings files by their path from the working directory; tests pass `_env_file=None`.
+- Nothing is bind-mounted but the local statements folder: the edge's `nginx/default.conf` is
+  baked into its image, and Compose copies the callers registry into each replica from
+  `A2A_CALLERS_YAML`, which `compose()` exports, labelled with its digest so a change recreates
+  them. A registry change therefore takes a `deploy.sh` run, not a restart.
+- The edge publishes `EDGE_HOST_PORT` (8030) on this machine's loopback interface and, on the
+  instance, on its address: a caller in Docker reaches it through `host.docker.internal` on
+  either.
+- Package `calagent` in `src`: `platform → application → ports → domain`; `adapters` import only
+  `ports` and `domain`. `domain`, `ports` and `application` import no framework (a2a, fastapi,
+  starlette, redis, pdfplumber, anthropic, openai, httpx, yaml, structlog, jwt). `lint-imports`
+  enforces this from `pyproject.toml`. `platform/a2a` holds everything that touches the SDK.
 - pdfplumber returns Hebrew in visual order: a Hebrew word's letters reversed, a cell's words left
   to right. Read cells by word positions through `adapters/pdf/words.py`, never from text lines.
 - a2a-sdk 1.x types are protobuf: use `HasField`, `TaskState.Name(state)`, `get_data_parts`, not
@@ -42,7 +40,9 @@ enforces this from `pyproject.toml`. `platform/a2a` holds everything that touche
 - The pause methods are `TaskUpdater.requires_input` and `requires_auth`; wire states are
   `TASK_STATE_*`, and the SDK ends the stream after an interrupted state.
 - The SDK stores `TASK_STATE_FAILED` whenever the executor raises, so a request is refused in
-  `platform/a2a/handler.py` before its task starts. Only `SendStreamingMessage` is served.
+  `platform/a2a/handler.py` before its task starts. Only `SendStreamingMessage` is served; its
+  SSE response sends a keep-alive comment every 15 seconds, which keeps a stream inside
+  CloudFront's 30-second origin read timeout on the EC2 target.
 - Numbers are doubles on the wire (`796.0`): amounts are `Decimal` inside and become `float`
   only in `to_wire` (`domain/rows.py`). Numbers never come from the model.
 - The SDK's task owner is the caller (the context user is the caller's name), not the person; the
@@ -56,3 +56,27 @@ enforces this from `pyproject.toml`. `platform/a2a` holds everything that touche
 - `tests/statements/` is tracked: real statements go in `statements/` or as `*.real.pdf`, never in
   `tests/statements/` under a plain name, and the anonymizer's `anonymize-*.json` mapping stays out
   of the repo. `tests/statements/2026-10.pdf` is the anonymized fixture every test runs on.
+- Before any AWS work, read this account's inventory, the
+  `aws-account-inventory-<account ID>.md` under `/mnt/c/Projects/-- docs --/` that lists
+  loan-simulator, whose EC2 instance this stack runs on as a guest.
+- `test.sh [all|unit]` (alias `it` for `all`) — the whole quality gate: bash syntax check, ruff,
+  mypy, lint-imports, pytest, the shell tests of `scripts/tests/`; `all` needs Docker.
+- `init-env.sh [--force]` — creates each missing gitignored `scripts/lib/secrets.sh`,
+  `params.sh` and `aws-config.sh` from its `.example.sh`; an existing file is kept unless
+  `--force` is given.
+- `deploy.sh` — runs `init-env.sh` first and stops on a list of every required setting still
+  blank, or on a missing callers registry, then builds and runs Redis, two replicas and the edge
+  in Docker Compose on :8030, and returns once the edge answers; `--ec2` does it on
+  loan-simulator's EC2 instance as a guest stack behind its own CloudFront distribution
+  (`template-ec2.yaml`, `docker-compose.ec2.yml`), in the account of the gitignored
+  `lib/aws-config.sh`.
+- `docker-helper.sh [--ec2]` — `--stop [--volumes]`, `--logs [-e] [service...]`, `--ps`;
+  `--ec2 --delete-stack` deletes this repo's guest stack.
+- `lib/ec2.sh` — the EC2 target: the stack's deploy, SSH with an Instance Connect key, Compose
+  against the instance's daemon. It, `template-ec2.yaml`, `lib/settings-guard.sh` (the checks
+  behind the pre-commit hook) and `.githooks/pre-commit` are the same files in every Docker
+  Compose repo, copied from loan-simulator byte for byte.
+- `tools/register-caller.sh` — registers or replaces an A2A caller in `allowed-callers.yaml`.
+- `tools/validate.sh [--tck]` — proves the agent from the client side; `--tck` adds the A2A TCK.
+- `tools/anonymize-statement.py` — copies a statement PDF with the holder's details replaced.
+- `tools/lock.sh` — recompiles `requirements.txt` inside the Dockerfile's Python image.

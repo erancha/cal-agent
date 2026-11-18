@@ -4,6 +4,11 @@
 .tck
 statements
 allowed-callers.yaml
+scripts/lib/secrets.sh
+scripts/lib/params.sh
+scripts/lib/aws-config.sh
+scripts/lib/.ssh
+backup
 anonymize-*.json
 *.real.pdf
 .git

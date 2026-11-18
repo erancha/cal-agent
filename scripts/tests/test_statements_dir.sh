@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Verifies ensure_statements_dir from scripts/common.sh: start.sh creates the statements root
-# before any launch, a relative STATEMENTS_DIR resolved against the repo whatever the working
-# directory, an absolute one as given, and an unset one stops naming the variable.
+# Verifies ensure_statements_dir from scripts/common.sh: deploy.sh creates the statements root
+# before it starts the local stack, a relative STATEMENTS_DIR resolved against the repo whatever
+# the working directory, an absolute one as given, and an unset one stops naming the variable.
 set -euo pipefail
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-mkdir -p "$WORK/repo/scripts" "$WORK/elsewhere"
+mkdir -p "$WORK/repo/scripts/lib" "$WORK/elsewhere"
 cp "$SCRIPTS_DIR/common.sh" "$WORK/repo/scripts/common.sh"
+cp "$SCRIPTS_DIR/lib/settings-guard.sh" "$SCRIPTS_DIR/lib/ec2.sh" "$WORK/repo/scripts/lib/"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
@@ -28,9 +29,10 @@ check STATEMENTS_DIR="$WORK/absolute/nested" >/dev/null || fail "absolute folder
 out="$(check)" && fail "unset STATEMENTS_DIR accepted"
 grep -q "STATEMENTS_DIR" <<<"$out" || fail "unset variable not named: $out"
 
-ensure_line="$(grep -n '^ensure_statements_dir$' "$SCRIPTS_DIR/start.sh" | cut -d: -f1)"
-compose_line="$(grep -n 'compose up' "$SCRIPTS_DIR/start.sh" | cut -d: -f1)"
-[ -n "$ensure_line" ] && [ "$ensure_line" -lt "$compose_line" ] \
-  || fail "start.sh does not create the statements root before compose up"
+local_stack="$(sed -n '/^deploy_local() {$/,/^}$/p' "$SCRIPTS_DIR/deploy.sh")"
+ensure_line="$(grep -n '^ *ensure_statements_dir$' <<<"$local_stack" | cut -d: -f1)"
+compose_line="$(grep -n 'compose up' <<<"$local_stack" | cut -d: -f1)"
+[ -n "$ensure_line" ] && [ -n "$compose_line" ] && [ "$ensure_line" -lt "$compose_line" ] \
+  || fail "deploy.sh does not create the statements root before the local compose up"
 
 echo "test_statements_dir: all checks passed"

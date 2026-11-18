@@ -10,7 +10,16 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES_WITH_CONTENTS = ["README.md", "docs/a2a-contract.md", "docs/testing.md"]
+PAGES_WITH_CONTENTS = [
+    "README.md",
+    "docs/a2a-contract.md",
+    "docs/architecture.md",
+    "docs/architecture/categorizer.md",
+    "docs/architecture/request-flow.md",
+    "docs/architecture/statements.md",
+    "docs/development.md",
+    "docs/testing.md",
+]
 
 _CONTENTS_LINK = re.compile(r"\[[^\]]+\]\(#([^)]+)\)")
 _HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$", re.MULTILINE)

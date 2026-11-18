@@ -3,6 +3,10 @@
 Where a person's statements live, how the Cal statement PDF is read, and the page that loads them.
 The agent reads only statements a person loaded themselves; it never logs in to the card site.
 
+**Contents:** [One folder per person](#one-folder-per-person) ·
+[The Cal statement](#the-cal-statement) · [Reading the PDF](#reading-the-pdf) ·
+[The statements page](#the-statements-page)
+
 ## One folder per person
 
 `STATEMENTS_DIR` is a root with one folder per person, named by their Google account id and
@@ -79,14 +83,14 @@ with both sums instead of quietly shrinking the month. The statement prints no v
 a row's id is the charge date and the row's position, `20261002-01`: stable for one file and
 unique across months.
 
-The test statement, `tests/statements/2026-10.pdf` (19 rows), is a real statement with the
-holder's private details replaced by `scripts/anonymize-statement.py`. The Cal PDF draws some words
-one glyph at a time and others whole, under one embedded font that holds several glyphs of
-different widths for one character, so the script finds each private word in the page's text
-joined in drawing order, redraws each character of its stand-in with the glyph closest in width to
-the one it replaces, and adjusts the character spacing so the word keeps its original width. Text
-extraction therefore sees the same columns as in the real file. The mapping of private words to
-stand-ins never enters the repo, and the run fails when any private word is still in the output.
+The test statement, `tests/statements/2026-10.pdf` (19 rows), is a real statement with the holder's
+private details replaced by `scripts/tools/anonymize-statement.py`. The Cal PDF draws some words one
+glyph at a time and others whole, under one embedded font that holds several glyphs of different
+widths for one character, so the script finds each private word in the page's text joined in drawing
+order, redraws each character of its stand-in with the glyph closest in width to the one it
+replaces, and adjusts the character spacing so the word keeps its original width. Text extraction
+therefore sees the same columns as in the real file. The mapping of private words to stand-ins never
+enters the repo, and the run fails when any private word is still in the output.
 
 ## The statements page
 
