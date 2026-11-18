@@ -136,8 +136,8 @@ Resources:
       SubnetId: !Ref SubnetId
       SecurityGroupIds: [!Ref SecurityGroup, !Ref Slot1, !Ref Slot2, !Ref Slot3, !Ref Slot4]
       BlockDeviceMappings:
-        # The disk outlives the instance, since it holds the database: a terminated instance
-        # leaves its volume in the account.
+        # The disk outlives the instance, since it holds every stack's Docker volumes and their
+        # data: a terminated instance leaves its volume in the account.
         - DeviceName: /dev/xvda
           Ebs:
             VolumeSize: !Ref DiskSizeGb
@@ -197,9 +197,9 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: http-only
               HTTPPort: !Ref OriginPort
-        # The page's index, the API, the event stream and the health routes always come from the
-        # agent, with every viewer header, cookie and query string: sign-in rides on a cookie and
-        # the event stream on the Last-Event-ID header.
+        # Every path outside /assets/ always comes from the stack, with every viewer header,
+        # cookie and query string, since a stack's pages, API, sign-in cookie and event streams
+        # (with their Last-Event-ID header) are never safe to cache.
         DefaultCacheBehavior:
           TargetOriginId: agent
           ViewerProtocolPolicy: redirect-to-https
@@ -208,8 +208,9 @@ Resources:
           CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
           OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
         CacheBehaviors:
-          # The build's script and stylesheet carry a content hash in their names, so the edge
-          # may keep them: the managed policy CachingOptimized.
+          # Files under /assets/, which a Vite frontend build names by a hash of their content,
+          # may be kept at the edge: the managed policy CachingOptimized. A stack with no such
+          # files never matches this path.
           - PathPattern: /assets/*
             TargetOriginId: agent
             ViewerProtocolPolicy: redirect-to-https
