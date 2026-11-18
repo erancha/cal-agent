@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 # The stack's EC2 target: the CloudFormation stack of scripts/template-ec2.yaml, and the instance's
 # Docker daemon reached over SSH. The same file in every Docker Compose repo; the repo's own
-# values come from scripts/lib/stack-params.sh (EC2_STACK, EC2_HOST_STACK, EC2_ORIGIN_PORT,
-# EC2_INSTANCE_TYPE). Sourced by scripts/common.sh, never executed.
+# values come from scripts/lib/stack-params.sh (EC2_STACK, EC2_ORIGIN_PORT, EC2_INSTANCE_TYPE)
+# and the deployment's choice of host from scripts/lib/params.sh (EC2_HOST_STACK). Sourced by
+# scripts/common.sh, never executed.
 #
 # Core responsibilities:
 # - load_aws_config: the deploying user's credentials and region, from the gitignored
 #   lib/aws-config.sh
 # - resolve_ec2_stack / deploy_ec2_stack / resolve_ec2_host: the stacks the git branch selects
 #   (this repo's and the host's), the deploy, and the instance and addresses
+# - require_ec2_host_stack: a guest's stop, with the reason, when its host stack is out of reach
 # - ec2_guest_slot: the host's security-group slot a guest stack opens its port in
 # - prepare_ec2_host: the instance's Docker daemon answering, and its swap file in place
 # - ssh_ec2 / use_ec2: a command on the instance, and Compose pointed at the instance's daemon
 # - delete_ec2_stack: the stack's deletion, which leaves the instance's disk
 #
-# One instance serves several repos. The host repo (EC2_HOST_STACK blank) owns it; a guest repo
-# names the host's stack in EC2_HOST_STACK, and its stack adds only a port, in one of the host's
-# free security-group slots, and a CloudFront distribution. Each repo runs its own Compose
-# project on the instance's one Docker daemon, on a port of its own.
+# One instance can serve several repos, and any repo's stack can be its host. A host stack
+# (EC2_HOST_STACK blank) owns the instance; a guest stack names the host's stack in
+# EC2_HOST_STACK, and adds only a port, in one of the host's free security-group slots, and a
+# CloudFront distribution. Each repo runs its own Compose project on the instance's one Docker
+# daemon, on a port of its own.
 #
 # The instance accepts SSH as ec2-user with an EC2 Instance Connect key, valid for 60 seconds after
 # each push and only for starting a connection, so every connection pushes the key first. One
@@ -45,14 +48,16 @@ load_aws_config() {
 }
 
 # Sets STACK_NAME from the git branch: main deploys EC2_STACK, any other branch EC2_STACK-fb; an
-# exported STACK_NAME wins. Sets HOST_STACK_NAME to the stack that owns the instance: this one in
-# the host repo, else EC2_HOST_STACK with the same suffix, so a feature branch's guest runs on the
-# host repo's feature-branch instance. An exported HOST_STACK_NAME wins too, for a stack that is a
-# guest of another stack of the same repo.
+# exported STACK_NAME wins. Sets HOST_STACK_NAME to the stack that owns the instance: this one
+# when EC2_HOST_STACK is blank, else EC2_HOST_STACK with the same suffix, so a feature branch's
+# guest runs on the host's feature-branch instance. An exported HOST_STACK_NAME wins too, for a
+# stack that is a guest of another stack of the same repo.
 resolve_ec2_stack() {
   local suffix=''
   [[ "$(git -C "$ROOT" branch --show-current)" == main ]] || suffix='-fb'
   STACK_NAME="${STACK_NAME:-$EC2_STACK$suffix}"
+  [[ -v EC2_HOST_STACK ]] ||
+    die "EC2_HOST_STACK is not set; copy its line from scripts/lib/params.example.sh to params.sh"
   if [[ -z "$EC2_HOST_STACK" ]]; then
     HOST_STACK_NAME="${HOST_STACK_NAME:-$STACK_NAME}"
   else
@@ -61,6 +66,26 @@ resolve_ec2_stack() {
 }
 
 ec2_is_host() { [[ "$HOST_STACK_NAME" == "$STACK_NAME" ]]; }
+
+# Stops unless a guest's host stack answers in this account and region and owns an instance: the
+# stack named in EC2_HOST_STACK may be undeployed, in another account or region, unreadable to
+# these credentials, or a guest itself. AWS's own error is passed on.
+require_ec2_host_stack() {
+  local account instance where
+  account="$(aws sts get-caller-identity --query Account --output text 2>&1)" ||
+    die "The credentials of aws-config.sh are refused, so host stack $HOST_STACK_NAME cannot be" \
+        "checked: ${account//$'\n'/ }"
+  where="account $account, region $AWS_DEFAULT_REGION"
+  instance="$(aws cloudformation describe-stacks --stack-name "$HOST_STACK_NAME" \
+    --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text 2>&1)" ||
+    die "Host stack $HOST_STACK_NAME, named by EC2_HOST_STACK of params.sh, cannot be read in" \
+        "$where: ${instance//$'\n'/ }. Deploy it first from its repo with ./scripts/deploy.sh --ec2 (on" \
+        "the same kind of branch, main or not), or correct EC2_HOST_STACK, or aws-config.sh's" \
+        "account and region."
+  [[ -n "$instance" && "$instance" != None ]] ||
+    die "Stack $HOST_STACK_NAME, named by EC2_HOST_STACK of params.sh in $where, is itself a" \
+        "guest and owns no instance; name its host stack instead."
+}
 
 ec2_stack_exists() {  # [stack]
   aws cloudformation describe-stacks --stack-name "${1:-$STACK_NAME}" >/dev/null 2>&1
@@ -175,9 +200,7 @@ deploy_ec2_stack() {
       parameters+=($creation)
     fi
   else
-    ec2_stack_exists "$HOST_STACK_NAME" ||
-      die "Host stack $HOST_STACK_NAME is not deployed; deploy it first from its repo:" \
-          "./scripts/deploy.sh --ec2 (on the same kind of branch, main or not)"
+    require_ec2_host_stack
     open_host_ssh_to "$my_address/32"
     parameters+=("HostStack=$HOST_STACK_NAME" "SlotGroupId=$(ec2_guest_slot)")
   fi
@@ -190,6 +213,7 @@ deploy_ec2_stack() {
 # (the CloudFront address) from this repo's.
 resolve_ec2_host() {
   ec2_stack_exists || die "Stack $STACK_NAME is not deployed; run ./scripts/deploy.sh --ec2"
+  ec2_is_host || require_ec2_host_stack
   EC2_INSTANCE_ID="$(ec2_stack_output "$HOST_STACK_NAME" InstanceId)"
   EC2_HOST="$(ec2_stack_output "$HOST_STACK_NAME" PublicAddress)"
   EC2_URL="$(ec2_stack_output "$STACK_NAME" CloudFrontUrl)"

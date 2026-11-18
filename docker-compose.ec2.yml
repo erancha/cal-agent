@@ -1,4 +1,4 @@
-# What changes when the stack runs on the EC2 instance of loan-simulator's stack;
+# What changes when the stack runs on its EC2 instance;
 # scripts/deploy.sh --ec2 passes this file after docker-compose.yml. The images are built on the
 # deployer's machine for the instance's ARM processor, under their own tags so the local stack's
 # images stay as they are. The edge keeps its port on the instance's address, where the security

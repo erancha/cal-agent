@@ -138,17 +138,18 @@ stops startup naming it. [architecture/configuration.md](architecture/configurat
 
 ## Deployment
 
-`./scripts/deploy.sh` runs the Compose stack on the workstation, where the edge publishes port
-8030 and the statements folder is a folder of the repo. `./scripts/deploy.sh --ec2` runs the same
-stack on loan-simulator's EC2 instance, as a guest stack of the shared CloudFormation template,
-`scripts/template-ec2.yaml`: it opens port 8030 to CloudFront's servers and adds a CloudFront
-distribution whose https address is the way in, and which the card advertises there
-([ADR 0007](adr/0007-guest-on-loan-simulators-ec2-instance.md)). The images are built on the
-deployer's machine for ARM and loaded into the instance's Docker daemon over SSH, and Compose runs
-there against that daemon, so nothing is bind-mounted from the deployer's machine: the edge's
-configuration is part of its image, Compose copies the callers registry into each replica, and on
-the instance the statements live in the `cal_statements` volume. `docker-compose.ec2.yml` holds
-what differs there.
+`./scripts/deploy.sh` runs the Compose stack on the workstation, where the edge publishes port 8030
+and the statements folder is a folder of the repo. `./scripts/deploy.sh --ec2` runs the same stack
+on an EC2 instance, as a stack of the shared CloudFormation template, `scripts/template-ec2.yaml`,
+that hosts the instance or joins another Docker Compose repo's as a guest
+([ADR 0008](adr/0008-any-docker-repo-can-host-the-instance.md)): it opens port 8030 to CloudFront's
+servers and adds a CloudFront distribution whose https address is the way in, and which the card
+advertises there ([ADR 0007](adr/0007-guest-on-loan-simulators-ec2-instance.md)). The images are
+built on the deployer's machine for ARM and loaded into the instance's Docker daemon over SSH, and
+Compose runs there against that daemon, so nothing is bind-mounted from the deployer's machine: the
+edge's configuration is part of its image, Compose copies the callers registry into each replica,
+and on the instance the statements live in the `cal_statements` volume. `docker-compose.ec2.yml`
+holds what differs there.
 
 ## Storage
 

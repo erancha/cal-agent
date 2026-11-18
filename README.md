@@ -98,10 +98,11 @@ openssl.
 5. Load a statement PDF on http://localhost:8030/statements.html; it is stored as its billing
    month, such as `2026-10.pdf`, in your own folder under `statements/`. The registered caller
    can now ask for that month.
-6. To run the stack on AWS instead, as a guest on loan-simulator's EC2 instance behind a
-   CloudFront distribution of its own, run `./scripts/deploy.sh --ec2`. It also names the access
-   key pair and region to fill in in `aws-config.sh`, and at the end prints the CloudFront
-   address to add to the Google client, where the statements page loads statements on the
+6. To run the stack on AWS instead, on an EC2 instance behind a CloudFront distribution of its own,
+   run `./scripts/deploy.sh --ec2`: on an instance of its own, or as a guest on another Docker
+   Compose repo's instance when `EC2_HOST_STACK` of `params.sh` names that repo's stack. It also
+   names the access key pair and region to fill in in `aws-config.sh`, and at the end prints the
+   CloudFront address to add to the Google client, where the statements page loads statements on the
    instance ([Development & deployment](docs/development.md#deployment-scripts-scripts)).
 
 `./scripts/test.sh` runs the checks and the tests; none needs a model key or reaches Google.
@@ -115,7 +116,7 @@ that proves the agent without any real caller, and the gotchas.
 - `test.sh` — the scripts' syntax, lint, type and layer checks, the unit tests and, by default,
   the integration tests
 - `deploy.sh` — builds and starts Redis, two replicas and the nginx edge in Docker; `--ec2` does
-  it on loan-simulator's EC2 instance behind CloudFront
+  it on an EC2 instance behind CloudFront
 - `docker-helper.sh` — stops the stack, follows its logs or shows its containers
 
 Each script's header comment is its full documentation, and `--help` prints it.

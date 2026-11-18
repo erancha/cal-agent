@@ -4,8 +4,7 @@
 # edge in Docker Compose, then return once the edge answers.
 #
 #   ./scripts/deploy.sh          on this machine's Docker
-#   ./scripts/deploy.sh --ec2    on the EC2 instance of loan-simulator's stack, as a guest behind
-#                                a CloudFront distribution of its own
+#   ./scripts/deploy.sh --ec2    on an EC2 instance, behind a CloudFront distribution of its own
 #   -h, --help                   show this help
 #
 # The agent refuses to start when LLM_MODEL is blank, when LLM_API_KEY is blank for a model other
@@ -21,18 +20,19 @@
 # shipped), where a caller in Docker reaches it at host.docker.internal. The statements page is
 # http://localhost:8030/statements.html, and the statements live in the STATEMENTS_DIR folder.
 #
-# --ec2 also needs the access key pair and region in scripts/lib/aws-config.sh, and deploys to
-# the account its credentials belong to. Deploy loan-simulator's stack first, from its repo: it
-# owns the instance. This script creates or updates this repo's CloudFormation stack of
-# scripts/template-ec2.yaml (the git branch selects it: cal-agent on main, cal-agent-fb on any
+# --ec2 also needs the access key pair and region in scripts/lib/aws-config.sh, and deploys to the
+# account its credentials belong to. The stack is the instance's host, unless EC2_HOST_STACK of
+# params.sh names another Docker Compose repo's host stack, deployed first from its repo: then it is
+# a guest on that stack's instance. This script creates or updates this repo's CloudFormation stack
+# of scripts/template-ec2.yaml (the git branch selects it: cal-agent on main, cal-agent-fb on any
 # other branch), which opens EDGE_HOST_PORT on the instance to CloudFront and adds a distribution
 # whose https address is the way in. It then builds the images here for ARM, loads them into the
 # instance's Docker daemon over SSH, and runs Compose against that daemon. The settings files and
-# the callers registry stay on this machine; each container's own settings, secrets included,
-# reach the instance as part of the container's configuration, which Docker keeps on the
-# instance's encrypted disk. On the instance the card advertises the CloudFront address, and the
-# statements live in the cal_statements volume, loaded through the statements page at that
-# address. Register the printed address with Google once (docs/sign-in.md).
+# the callers registry stay on this machine; each container's own settings, secrets included, reach
+# the instance as part of the container's configuration, which Docker keeps on the instance's
+# encrypted disk. On the instance the card advertises the CloudFront address, and the statements
+# live in the cal_statements volume, loaded through the statements page at that address. Register
+# the printed address with Google once (docs/sign-in.md).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh

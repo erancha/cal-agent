@@ -58,20 +58,20 @@ registry, `allowed-callers.yaml`, is gitignored and not checked by the hook.
   of the repo. `tests/statements/2026-10.pdf` is the anonymized fixture every test runs on.
 - Before any AWS work, read this account's inventory, the
   `aws-account-inventory-<account ID>.md` under `/mnt/c/Projects/-- docs --/` that lists
-  loan-simulator, whose EC2 instance this stack runs on as a guest.
+  the stacks deployed there and which one hosts the instance.
 - `test.sh [all|unit]` (alias `it` for `all`) — the whole quality gate: bash syntax check, ruff,
   mypy, lint-imports, pytest, the shell tests of `scripts/tests/`; `all` needs Docker.
 - `init-env.sh [--force]` — creates each missing gitignored `scripts/lib/secrets.sh`,
   `params.sh` and `aws-config.sh` from its `.example.sh`; an existing file is kept unless
   `--force` is given.
-- `deploy.sh` — runs `init-env.sh` first and stops on a list of every required setting still
-  blank, or on a missing callers registry, then builds and runs Redis, two replicas and the edge
-  in Docker Compose on :8030, and returns once the edge answers; `--ec2` does it on
-  loan-simulator's EC2 instance as a guest stack behind its own CloudFront distribution
-  (`template-ec2.yaml`, `docker-compose.ec2.yml`), in the account of the gitignored
+- `deploy.sh` — runs `init-env.sh` first and stops on a list of every required setting still blank,
+  or on a missing callers registry, then builds and runs Redis, two replicas and the edge in Docker
+  Compose on :8030, and returns once the edge answers; `--ec2` does it on an EC2 instance, its own
+  or another repo's as a guest (`EC2_HOST_STACK` of `params.sh`), behind its own CloudFront
+  distribution (`template-ec2.yaml`, `docker-compose.ec2.yml`), in the account of the gitignored
   `lib/aws-config.sh`.
 - `docker-helper.sh [--ec2]` — `--stop [--volumes]`, `--logs [-e] [service...]`, `--ps`;
-  `--ec2 --delete-stack` deletes this repo's guest stack.
+  `--ec2 --delete-stack` deletes this repo's EC2 stack.
 - `lib/ec2.sh` — the EC2 target: the stack's deploy, SSH with an Instance Connect key, Compose
   against the instance's daemon. It, `template-ec2.yaml`, `lib/settings-guard.sh` (the checks
   behind the pre-commit hook) and `.githooks/pre-commit` are the same files in every Docker

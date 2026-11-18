@@ -24,7 +24,7 @@ EXAMPLES = (LIB / "params.example.sh", LIB / "secrets.example.sh")
 SCRIPTS = REPO / "scripts"
 
 # Read by scripts/lib/ec2.sh only, for deploy.sh --ec2.
-EC2_KEYS = {"EC2_STACK", "EC2_HOST_STACK", "EC2_ORIGIN_PORT"}
+EC2_KEYS = {"EC2_STACK", "EC2_HOST_STACK", "EC2_ORIGIN_PORT", "EC2_INSTANCE_TYPE"}
 # Read by docker-compose.yml only.
 COMPOSE_ONLY_KEYS = {"EDGE_HOST_PORT"}
 # Read by scripts/lib/settings-guard.sh only: the address tracked files may show.
