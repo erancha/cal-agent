@@ -2,8 +2,9 @@
 
 cal-agent knows people by their Google account and nothing else: the statements page signs a
 person in with the agent's own Google OAuth client, and every A2A call forwards the person's Google
-ID token issued to the registered caller's client. How the agent checks both is in
-[request-flow.md](architecture/request-flow.md#who-is-calling); this page sets up the Google side.
+ID token issued to the registered caller's client. This page explains how sign-in works and how to
+set up the Google side, behind [Architecture](architecture.md#request-flow); how the agent checks
+both credentials is in [Request flow](architecture/request-flow.md#who-is-calling).
 
 ## How it works
 

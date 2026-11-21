@@ -70,6 +70,9 @@ Tests mirror the package's layout under `tests/`. What the unit layer pins, by a
   files under `scripts/lib/` document every setting and nothing else, no secret among the committed
   ones, and unfilled copies of the examples do not start the agent. The sweep retries a pass that
   cannot reach Redis and stops on any other error, and `/health` then answers `DOWN`.
+- **The API document.** `tests/platform/test_api_doc.py` reads every route the app declares and
+  fails, naming the route, when [API endpoints](api.md) leaves one out or names one the app does
+  not declare.
 - **The Compose files.** Only the edge publishes a port; each replica receives exactly the keys the
   agent reads and the callers registry as copied-in content, never a bind mount; on the EC2
   instance every image built here carries the `:ec2` tag for ARM, every service restarts with the

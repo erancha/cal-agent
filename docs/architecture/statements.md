@@ -1,7 +1,9 @@
 # Statements
 
-Where a person's statements live, how the Cal statement PDF is read, and the page that loads them.
-The agent reads only statements a person loaded themselves; it never logs in to the card site.
+This document details the [Statements](../architecture.md#statements) that Architecture
+summarizes: where a person's statements live, how the Cal statement PDF is read, and the page that
+loads them. The agent reads only statements a person loaded themselves; it never logs in to the
+card site.
 
 **Contents:** [One folder per person](#one-folder-per-person) ·
 [The Cal statement](#the-cal-statement) · [Reading the PDF](#reading-the-pdf) ·
@@ -98,14 +100,8 @@ enters the repo, and the run fails when any private word is still in the output.
 PDFs into their own folder and deletes them. It does nothing else: reading, categorizing and
 reviewing a month stay with the A2A skill and its callers. The page reads this agent's Google
 client id from `GET /api/auth/config`, keeps the ID token in memory only and sends it as the bearer
-token of every API call; a 401 brings the sign-in button back.
-
-| Request | Answer |
-|---|---|
-| `GET /api/statements` | The person's statement files: `fileName`, `sizeBytes`, `modified`. |
-| `POST /api/statements`, multipart part `file` | 201 with the stored file; 400 for a refused file, 413 over the 5 MB upload limit, each a problem document whose `detail` names the cause. |
-| `DELETE /api/statements/{fileName}` | 204; 400 when no listed statement has that name. |
-| any of the above without an acceptable token | 401 with `WWW-Authenticate: Bearer`. |
+token of every API call; a 401 brings the sign-in button back. Each route the page calls, and what
+it answers, is in [API endpoints](../api.md#the-statements-page).
 
 An upload is refused when it is not a PDF, does not parse as a Cal statement, or is for a month
 another file already covers; a statement already loaded is not replaced, so the person removes the

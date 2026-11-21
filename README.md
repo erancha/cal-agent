@@ -123,11 +123,24 @@ Each script's header comment is its full documentation, and `--help` prints it.
 
 ## Details
 
-- [Architecture](docs/architecture.md) — the parts, the boundaries and a page per subsystem
+- [Architecture](docs/architecture.md) — the Compose services, the boundaries, a summary per
+  subsystem, the edge on EC2, storage and the codebase
+- [API endpoints](docs/api.md) — every route of the agent, who may call it and what it answers
+- [Workers' responsibilities and flows](docs/workers.md) — the lease sweep each replica runs
 - [A2A contract](docs/a2a-contract.md) — what cal-agent puts on the wire for the shared skill
+- [Request flow](docs/architecture/request-flow.md) — a request through the stack and inside a
+  replica: the credentials, the admission and the executor
+- [Statements](docs/architecture/statements.md) — the folder per person, how the Cal PDF is read,
+  and the statements page
+- [Categorizer](docs/architecture/categorizer.md) — the merchant memory, the prompt and the
+  providers
+- [Scaling](docs/architecture/scaling.md) — what the replicas guarantee and the edge service
+- [Design patterns](docs/design-patterns.md) — the layers of the package and how they are
+  enforced
+- [Data model](docs/data-model.md) — every Redis key, the statements root and the callers registry
 - [Sign-in](docs/sign-in.md) — setting up the Google side of the page's and the callers' sign-ins
 - [Development & deployment](docs/development.md) — the settings files, the tests, the
-  scripts, registering a caller, loading statements and the gotchas
+  scripts, the EC2 stack, registering a caller, loading statements and the gotchas
 - [Testing](docs/testing.md) — what each test layer proves
 - [Decisions](docs/adr/) — one record per founding decision and why it was made: the SDK,
   the replicas, the statements, sign-in, the model's role, the layers and EC2

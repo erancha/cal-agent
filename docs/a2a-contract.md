@@ -32,7 +32,7 @@ it checks the credentials, and the errors it answers with.
 - The skill is served by `SendStreamingMessage` only. The blocking `SendMessage` is refused with
   `UnsupportedOperation` (-32004), message `this agent only streams; use SendStreamingMessage`:
   a `continue` takes the task's lease before the task resumes and hands it to the run on the
-  stream (see [scaling.md](architecture/scaling.md#the-lease)).
+  stream (see [scaling.md](architecture/scaling.md#the-task-lease)).
 
 ## Agent Card
 
@@ -124,7 +124,7 @@ A replica that stops while a task works leaves the task `TASK_STATE_WORKING` wit
 three lease periods (three minutes by default) a replica's sweep marks it `TASK_STATE_FAILED` with
 the status text
 `stopped while reading 2026-10; start the review again` (see
-[scaling.md](architecture/scaling.md#the-sweep)).
+[`LeaseSweep`](workers.md#leasesweep)).
 
 `SubscribeToTask` with the task id streams a working task from whichever replica receives it: the
 stream opens with the task as stored and follows the events of the replica running it, until the
@@ -264,10 +264,7 @@ A task belongs to the caller that started it, and the task's pause names its per
 caller asking for the task gets `TaskNotFound`; another person continuing it through the same
 caller gets `TASK_STATE_AUTH_REQUIRED`.
 
-The statements page's own API, `/api/statements`, takes the person's token alone, issued to this
-agent's own client (`AUTH_CLIENT_ID`); without an acceptable one it answers 401 with a problem
-document. `GET /.well-known/agent-card.json`, `GET /health`, `/statements.html` and
-`GET /api/auth/config` are open.
+The statements page's routes and which routes are open are in [API endpoints](api.md).
 
 With `A2A_AUTH_REQUIRED=false` neither credential is read, the card declares no security scheme,
 and every request is for the one person `anonymous`.

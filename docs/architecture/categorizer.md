@@ -1,7 +1,9 @@
 # Categorizer
 
-How each row gets a category from the shared taxonomy and a confidence, `high`, `medium` or `low`.
-Amounts and dates never pass through a model; only the category and the display name do.
+This document details the [Categorizer](../architecture.md#categorizer) that Architecture
+summarizes: how each row gets a category from the shared taxonomy and a confidence, `high`,
+`medium` or `low`. Amounts and dates never pass through a model; only the category and the display
+name do.
 
 **Contents:** [Merchants, not rows](#merchants-not-rows) ·
 [The merchant memory](#the-merchant-memory) · [The prompt](#the-prompt) · [Providers](#providers)

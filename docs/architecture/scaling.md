@@ -1,8 +1,11 @@
 # Scaling
 
+This document details the [Scaling](../architecture.md#scaling) that Architecture summarizes.
 The Docker stack runs the agent as several replicas behind an nginx edge, all on one Redis and one
 statements folder, so a caller sees one agent whichever replica serves it. This page states what
-the replicas guarantee and the mechanisms that carry each guarantee.
+the replicas guarantee and the mechanisms that carry each guarantee, under two concerns: **scaling
+safety**, that it is safe to run more than one replica without errors; and **scaling out**, that
+adding replicas serves more callers without degrading any caller's experience.
 
 ## Scaling safety
 
@@ -12,7 +15,8 @@ In particular:
 
 - **A stopped replica leaves a failed task, never a stuck one.** A replica stopped while a task
   works leaves the caller a `TASK_STATE_FAILED` task within three lease periods, with a text asking
-  to start again, and the month can be fetched again at once.
+  to start again, and the month can be fetched again at once; every replica's
+  [lease sweep](../workers.md#leasesweep) finds such a task.
 - **A continue runs once.** Two continues sent at once for one paused task, to one replica or two,
   run it once; the other is refused as already running.
 - **A subscribe reaches the running task.** `SubscribeToTask` sent to any replica streams the
@@ -43,7 +47,7 @@ subscriber that arrives late must replay what it missed.
 Redis writes all of it to an append-only file every second, so a paused task survives a restart of
 Redis.
 
-### The lease
+### The task lease
 
 The SDK has no notion of which replica runs a task, so the agent adds one. A lease,
 `cal:lease:<taskId>`, holds the owner of one request: the replica's identity and a call id. It is
@@ -54,30 +58,15 @@ once, the second cannot take the lease and is refused before its task resumes, w
 version check as the net under it. A request whose caller disconnects never releases a lease early:
 the run it started may still be working, so the lease expires with its time to live.
 
-### The sweep
-
-Every replica runs a sweep at startup and then every lease period. It reads the working tasks of
-every caller, and a task found without a lease on two passes in a row, at the same version, was
-left by a replica that stopped. The sweep saves it `TASK_STATE_FAILED` with the text
-`stopped while reading 2026-10; start the review again`, publishes that status to the task's event
-stream, so a subscriber on any replica sees the end, then deletes the stream. Two passes, because
-a replica releases the lease a moment before the SDK saves the task's final state, and one pass
-could fall in between. Of two replicas failing one task, the version check lets one win.
-
-A pass that cannot reach Redis is logged and retried at the next interval, so a Redis restart does
-not end the sweep. Any other error ends it, and the replica's `/health` then answers 503 `DOWN`,
-reporting the replica unhealthy rather than letting it go on without recovery.
-
 ## Scaling out
 
-Scaling out, as this page and the `scaling-out` label use the term, is scalability in the classic
-sense: the agent serves more callers by adding replicas, and a caller's experience, the time a
-month takes to fetch and categorize, stays what it is from a single replica. Beyond the shared
-statements folder and task store, one thing carries this: a merchant costs one model call per
-person, whichever replica meets it first. The merchant memory ([categorizer.md](categorizer.md))
-is a Redis hash per person, `cal:merchants:<sub>`, kept without expiry, so a month fetched through
-any replica, or after any restart, is categorized as fast as through the one that saw its merchants
-first.
+Scaling out, as this page uses the term, is scalability in the classic sense: the agent serves more
+callers by adding replicas, and a caller's experience, the time a month takes to fetch and
+categorize, stays what it is from a single replica. Beyond the shared statements folder and task
+store, one thing carries this: a merchant costs one model call per person, whichever replica meets
+it first. The merchant memory ([categorizer.md](categorizer.md)) is a Redis hash per person,
+`cal:merchants:<sub>`, kept without expiry, so a month fetched through any replica, or after any
+restart, is categorized as fast as through the one that saw its merchants first.
 
 ## The edge service
 

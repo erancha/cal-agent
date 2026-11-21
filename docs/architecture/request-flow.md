@@ -1,11 +1,39 @@
 # Request flow
 
-What happens inside one replica between a caller's request for a month and the last row it
-receives, and why the agent is built that way.
+This document details the [Request flow](../architecture.md#request-flow) that Architecture
+summarizes: the path a request takes through the stack, what happens inside one replica between a
+caller's request for a month and the last row it receives, and why the agent is built that way.
 
-**Contents:** [The SDK's routes](#the-sdks-routes) · [Who is calling](#who-is-calling) ·
+**Contents:** [The path of a request](#the-path-of-a-request) ·
+[The SDK's routes](#the-sdks-routes) · [Who is calling](#who-is-calling) ·
 [Admission before the task starts](#admission-before-the-task-starts) ·
 [The executor](#the-executor)
+
+## The path of a request
+
+A request walks the [Architecture](../architecture.md) diagram left to right:
+
+- **A2A client**, the caller, reads cal-agent's Agent Card, checks it offers the skill, and asks
+  for a billing month, for example `{"month": "2026-10"}`, sending its registered secret and the
+  signed-in person's Google ID token, so cal-agent knows which caller asks and for whom.
+- **nginx edge** spreads requests over the replicas; everything listed below runs inside the
+  replica that got the request.
+- **Credential checks** admit the call only when it carries a secret the agent issued to a
+  registered caller, and verify the person's token against **Google public keys**.
+- **a2a-sdk request handler**, the official A2A server library for Python, turns the call into a
+  task. The task and each of its events are kept in **Redis**, so a task paused by one replica can
+  be continued through any, and a running task can be followed from any. A lease in Redis names
+  the replica running each task, so a task runs once even when two requests race for it.
+- **Executor** is this repo's card work: have the **PDF parser** read that month's statement from
+  the person's own folder in the **statements root**, and have the **Merchant categorizer** label
+  the merchants, asking the **LLM** (Anthropic's or OpenAI's) only about merchants it has not
+  decided for this person before; its decisions are remembered in Redis. The charges stream back
+  along the same path in batches, each with a category such as `groceries` or `insurance`. When
+  the statement is not loaded yet, the executor leaves the task open and asks for it; once the
+  person has loaded the file, the caller says "continue" and the same task finishes. A token that
+  has expired pauses the task the same way until the person signs in again.
+
+The same path in time, inside one replica:
 
 ```mermaid
 sequenceDiagram
@@ -124,9 +152,9 @@ message and does the same with the lease the handler took. It then fetches the m
 statement found and parsed, the merchants categorized, the rows streamed in chunks of 25 on one
 artifact, and `TASK_STATE_COMPLETED`. While it works it renews the lease every third of the lease
 period, and losing the lease stops the work and fails the task: no replica takes over a working
-task, and the sweep fails a working task that holds no lease. A missing statement pauses the
-task; a statement, categorizer or model failure is raised with its cause, and the SDK fails the
-task with that text.
+task, and the [lease sweep](../workers.md#leasesweep) fails a working task that holds no lease. A
+missing statement pauses the task; a statement, categorizer or model failure is raised with its
+cause, and the SDK fails the task with that text.
 
 Every replica runs on one event loop. The model clients are asynchronous, so one task's wait for
 the model never holds up another's stream, and the statement lookup a task makes, which can parse a

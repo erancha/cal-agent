@@ -7,7 +7,8 @@ describes what the scripts run. Each script's header comment is its full documen
 
 **Contents:** [Working copy location](#working-copy-location) · [Configuration](#configuration) ·
 [Backend tests](#backend-tests) · [Deployment scripts (scripts/)](#deployment-scripts-scripts) ·
-[Registering a caller](#registering-a-caller) · [Loading statements](#loading-statements) ·
+[The EC2 stack](#the-ec2-stack) · [Registering a caller](#registering-a-caller) ·
+[Loading statements](#loading-statements) ·
 [Running the agent on the host](#running-the-agent-on-the-host) · [Gotchas](#gotchas)
 
 ## Working copy location
@@ -37,7 +38,13 @@ it first on every run, and stops with a list of every setting it needs that is s
 
 Every other setting is committed in [stack-params.sh](../scripts/lib/stack-params.sh): the
 edge's port, the URL the card advertises, the statements folder, the EC2 stack's names and every
-optional setting at its default. `AGENT_URL` is `http://host.docker.internal:8030` as shipped,
+optional setting at its default. Each setting is explained once, in `stack-params.sh` or in the
+`.example.sh` beside a gitignored file: the required ones are uncommented, every optional one is
+commented out at its default, and the test-only ones are marked as such.
+`tests/test_settings_files.py` holds the files to the settings the code reads, so no setting goes
+unexplained, and `tests/test_compose.py` holds the replicas' environment to the same list.
+
+`AGENT_URL` is `http://host.docker.internal:8030` as shipped,
 since a caller in Docker on this machine, such as the home finance agent, reaches the edge there;
 `localhost` would be the caller's own container. On the EC2 instance the card advertises the
 stack's CloudFront address instead. An edit to any of the three files takes a `deploy.sh` run.
@@ -47,11 +54,40 @@ one of its secrets or email addresses, the license contact of `params.sh` except
 sets `core.hooksPath` to `.githooks`, whose `pre-commit` hook makes the same check on every
 commit's staged changes. The callers registry, `allowed-callers.yaml`, is gitignored on its own.
 
-The scripts export the three files into their shell before calling Compose, so a bare
-`docker compose` call has no settings. The files hold the host forms of `STATEMENTS_DIR` and
-`A2A_CALLERS_FILE`; Compose replaces both with the paths inside the container. Host commands
-(pytest, uvicorn) run from the repo root, because the agent reads the settings files by their
-path from the working directory.
+The agent reads every setting once, at startup. The scripts export the three files into their
+shell before calling Compose, so a bare `docker compose` call has no settings. Compose hands each
+replica only the keys the agent reads, listed in `docker-compose.yml`. The files hold the host
+forms of `STATEMENTS_DIR` and `A2A_CALLERS_FILE`; Compose replaces both with the paths inside the
+container. Host commands (pytest, uvicorn) run from the repo root, because the agent reads the
+settings files by their path from the working directory.
+
+A wrong required setting stops startup naming the variable, so a misconfigured agent never serves a
+single request. Secrets, the model and the statements folder have no default for the same reason: a
+guessed value would let the agent start and fail later, far from the cause. The same holds for the
+files the settings name: a statements root that is not an existing directory (`STATEMENTS_DIR`)
+stops startup naming the path, a static folder without the statements page (`STATIC_DIR`) stops
+startup naming the file, and so, while authentication is required, does a callers file that is
+missing, empty, or registers a blank field or two callers with one secret or one name. `deploy.sh`
+creates the statements root before it starts the local stack, since Docker would otherwise create a
+missing mount source owned by root, where the agent, running as the person who started it, cannot
+write uploads. On the EC2 instance the statements root is the `cal_statements` volume instead, which
+starts as a copy of the image's empty `/statements` folder, owned by the agent's user. The image
+sets `STATIC_DIR` to where it installs the page, since the installed package does not sit beside the
+repo's `static/` folder.
+
+Four settings or values serve tests only. `AUTH_PUBLIC_KEY_FILE` replaces Google's published keys
+with one PEM public key, so tests sign their own tokens; `CAL_TEST_SLOW_MS` makes every classifier
+call wait first, so the multi-replica tests can act while a task works. Two more change what the
+agent is:
+
+- `LLM_MODEL=keyword` replaces the language model with a keyword table, so it needs no model or
+  key ([Categorizer](architecture/categorizer.md#providers)).
+- `A2A_EXECUTOR=tck` replaces the card executor with the scenario executor the official A2A
+  conformance suite scripts against, and turns authentication off
+  ([Testing](testing.md#conformance)). Since it then serves every request without
+  credentials, startup logs a warning naming it, and refuses it beside a shared Redis
+  (`TASKS_REDIS_URL`) or an existing callers file, so it never runs inside a real deployment.
+  `tools/validate.sh --tck` is the one place that sets it.
 
 ## Backend tests
 
@@ -77,21 +113,9 @@ reachable.
   first while no caller is registered (below), and ends with the values a caller's operator
   records: this agent's name, `cal`, the advertised URL and the statements page's URL.
 - `deploy.sh --ec2` — deploys to an EC2 instance in the account of `aws-config.sh`, and needs the
-  AWS CLI, `ssh` and `curl`. The stack is a host, with an instance of its own, while
-  `EC2_HOST_STACK` of `params.sh` is blank. Set to another Docker Compose repo's host stack, it is a
-  guest on that instance, which is deployed first from its repo; `aws-config.sh` then names that
-  stack's account and region, since a guest's stacks import the host stack's exports
-  ([ADR 0008](adr/0008-any-docker-repo-can-host-the-instance.md)).
-  The script creates or updates this repo's stack of
-  [`template-ec2.yaml`](../scripts/template-ec2.yaml), which opens port 8030 on the
-  instance to CloudFront and adds a CloudFront distribution, builds the images here for ARM, loads
-  them into the instance's Docker daemon over SSH and starts the stack there. It prints the
-  CloudFront address to register with Google ([Sign-in](sign-in.md#setting-up-google)) and the
-  values a caller's operator records there. The git branch selects the stacks: `main` deploys
-  `cal-agent`, any other branch `cal-agent-fb`, a guest on the host's `-fb` instance; an exported
-  `STACK_NAME` wins. Every deploy, host or guest, also makes sure the instance has a 1 GB swap file
-  (`prepare_ec2_host` in `lib/ec2.sh`), so a burst beyond the instance's 2 GB of memory slows the
-  stacks instead of killing a container.
+  AWS CLI, `ssh` and `curl`; [The EC2 stack](#the-ec2-stack) has what it creates and runs there.
+  It prints the CloudFront address to register with Google
+  ([Sign-in](sign-in.md#setting-up-google)) and the values a caller's operator records there.
 - [`docker-helper.sh`](../scripts/docker-helper.sh) — `--stop [--volumes]`,
   `--logs [-e] [service...]` or `--ps` for the stack; `--volumes` also drops the paused tasks
   and the merchant memory held in the Redis volume, and on the instance the statements. With
@@ -120,6 +144,29 @@ The IAM user of `aws-config.sh` needs to create and delete the stack's resources
 (CloudFormation, a rule in the host's security group, CloudFront distributions), to update the
 host stack's SSH rule, and `ec2-instance-connect:SendSSHPublicKey` for the SSH connection. No IAM
 user has these by default; an administrator has them all.
+
+## The EC2 stack
+
+`./scripts/deploy.sh --ec2` runs the same Compose stack on an EC2 instance, as a stack of the shared
+CloudFormation template, [`template-ec2.yaml`](../scripts/template-ec2.yaml), that hosts the
+instance or joins another Docker Compose repo's as a guest: it opens port 8030 to CloudFront's
+servers and adds a CloudFront distribution whose https address is the way in, and which the card
+advertises there ([ADR 0007](adr/0007-guest-on-loan-simulators-ec2-instance.md)). The images are
+built on the deployer's machine for ARM and loaded into the instance's Docker daemon over SSH, and
+Compose runs there against that daemon, so nothing is bind-mounted from the deployer's machine: the
+edge's configuration is part of its image, Compose copies the callers registry into each replica,
+and on the instance the statements live in the `cal_statements` volume. `docker-compose.ec2.yml`
+holds what differs there.
+
+The stack is a host, with an instance of its own, while `EC2_HOST_STACK` of `params.sh` is blank.
+Set to another Docker Compose repo's host stack, it is a guest on that instance, which is deployed
+first from its repo; `aws-config.sh` then names that stack's account and region, since a guest's
+stacks import the host stack's exports
+([ADR 0008](adr/0008-any-docker-repo-can-host-the-instance.md)). The git branch selects the
+stacks: `main` deploys `cal-agent`, any other branch `cal-agent-fb`, a guest on the host's `-fb`
+instance; an exported `STACK_NAME` wins. Every deploy, host or guest, also makes sure the instance
+has a 1 GB swap file (`prepare_ec2_host` in `lib/ec2.sh`), so a burst beyond the instance's 2 GB
+of memory slows the stacks instead of killing a container.
 
 ## Registering a caller
 
