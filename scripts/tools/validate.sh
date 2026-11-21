@@ -112,8 +112,10 @@ echo "==> client-side checks against $BASE"
 stop_last_agent
 
 PROVIDER_PORT=8033
+# A model the price table lists, since the agent refuses an unlisted one at startup.
+declare -A LISTED_MODEL=([anthropic]=claude-haiku-5-5 [openai]=gpt-5-mini)
 for provider in anthropic openai; do
-  run_agent "$PROVIDER_PORT" "$provider:placeholder"
+  run_agent "$PROVIDER_PORT" "$provider:${LISTED_MODEL[$provider]}"
   echo "==> $provider provider boots"
   stop_last_agent
 done
