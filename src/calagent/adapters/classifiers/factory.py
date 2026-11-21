@@ -3,6 +3,7 @@
 from calagent.adapters.classifiers.anthropic import AnthropicClassifier
 from calagent.adapters.classifiers.keyword import KeywordClassifier
 from calagent.adapters.classifiers.openai import OpenAIClassifier
+from calagent.adapters.model_costs import require_price
 from calagent.ports.classifier import MerchantClassifier
 
 
@@ -16,6 +17,7 @@ def classifier_for(llm_model: str, api_key: str | None) -> MerchantClassifier:
         )
     if api_key is None:
         raise ValueError(f"LLM_API_KEY is required for LLM_MODEL {llm_model!r}")
+    require_price(llm_model)
     if provider == "anthropic":
         return AnthropicClassifier(model, api_key)
     return OpenAIClassifier(model, api_key)

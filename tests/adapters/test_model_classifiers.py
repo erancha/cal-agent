@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Callable
 
 import anthropic
@@ -11,6 +12,7 @@ from calagent.adapters.classifiers.factory import classifier_for
 from calagent.adapters.classifiers.keyword import KeywordClassifier
 from calagent.adapters.classifiers.openai import OpenAIClassifier
 from calagent.adapters.classifiers.schema import ANSWERS_SCHEMA, answers_from
+from calagent.adapters.model_costs import MODEL_CALL_LOGGER
 from calagent.domain.errors import ClassifierError
 from calagent.domain.prompt import SYSTEM_PROMPT
 from calagent.ports.classifier import MerchantAnswer, MerchantQuery
@@ -46,7 +48,7 @@ def _anthropic(
     client = anthropic.AsyncAnthropic(
         api_key="k", max_retries=0, http_client=httpx2.AsyncClient(transport=transport)
     )
-    return AnthropicClassifier("m", "k", client=client), sent
+    return AnthropicClassifier("claude-haiku-5-5", "k", client=client), sent
 
 
 def _openai(
@@ -56,10 +58,14 @@ def _openai(
     client = openai.AsyncOpenAI(
         api_key="k", max_retries=0, http_client=httpx2.AsyncClient(transport=transport)
     )
-    return OpenAIClassifier("m", "k", client=client), sent
+    return OpenAIClassifier("gpt-5-mini", "k", client=client), sent
 
 
-def _anthropic_reply(content: list[dict[str, object]], stop_reason: str) -> dict[str, object]:
+def _anthropic_reply(
+    content: list[dict[str, object]],
+    stop_reason: str,
+    usage: dict[str, int] | None = None,
+) -> dict[str, object]:
     return {
         "id": "msg_1",
         "type": "message",
@@ -68,12 +74,15 @@ def _anthropic_reply(content: list[dict[str, object]], stop_reason: str) -> dict
         "content": content,
         "stop_reason": stop_reason,
         "stop_sequence": None,
-        "usage": {"input_tokens": 1, "output_tokens": 1},
+        "usage": usage or {"input_tokens": 1, "output_tokens": 1},
     }
 
 
 def _openai_reply(
-    content: str | None, finish_reason: str, refusal: str | None = None
+    content: str | None,
+    finish_reason: str,
+    refusal: str | None = None,
+    usage: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "id": "c1",
@@ -87,6 +96,7 @@ def _openai_reply(
                 "message": {"role": "assistant", "content": content, "refusal": refusal},
             }
         ],
+        "usage": usage or {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
     }
 
 
@@ -170,8 +180,8 @@ def test_the_answer_schema_satisfies_strict_mode_at_every_level() -> None:
 @pytest.mark.parametrize(
     ("setting", "adapter"),
     [
-        ("anthropic:claude-x", AnthropicClassifier),
-        ("openai:gpt-x", OpenAIClassifier),
+        ("anthropic:claude-haiku-5-5", AnthropicClassifier),
+        ("openai:gpt-5-mini", OpenAIClassifier),
     ],
 )
 def test_factory_picks_the_provider_adapter(setting: str, adapter: Callable[..., object]) -> None:
@@ -237,3 +247,74 @@ async def test_openai_non_json_content_is_a_classifier_error() -> None:
 def test_a_reply_in_another_shape_is_a_classifier_error(reply: object) -> None:
     with pytest.raises(ClassifierError, match="unexpected shape"):
         answers_from(reply)
+
+
+def test_factory_refuses_a_model_without_a_listed_price() -> None:
+    with pytest.raises(ValueError, match="PRICE_PER_MILLION"):
+        classifier_for("anthropic:claude-unlisted", "key")
+
+
+def _logged_lines(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
+    return [json.loads(r.getMessage()) for r in caplog.records if r.name == MODEL_CALL_LOGGER]
+
+
+async def test_an_anthropic_call_logs_its_tokens_at_each_rate(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=MODEL_CALL_LOGGER)
+    tool_use = {"type": "tool_use", "id": "t1", "name": "answers", "input": {"answers": ANSWERS}}
+    usage = {
+        "input_tokens": 200,
+        "output_tokens": 50,
+        "cache_read_input_tokens": 1000,
+        "cache_creation_input_tokens": 300,
+    }
+    classifier, _ = _anthropic(_anthropic_reply([tool_use], "tool_use", usage))
+
+    await classifier.classify(QUERIES)
+
+    [line] = _logged_lines(caplog)
+    assert line["kind"] == "categorize"
+    assert line["model"] == "anthropic:claude-haiku-5-5"
+    assert (line["input_tokens"], line["cache_read_tokens"], line["cache_write_tokens"]) == (
+        200,
+        1000,
+        300,
+    )
+    assert line["cost"] == pytest.approx((200 * 0.10 + 50 * 0.50 + 1000 * 0.01 + 300 * 0.125) / 1e6)
+
+
+async def test_an_anthropic_reply_without_answers_is_still_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=MODEL_CALL_LOGGER)
+    classifier, _ = _anthropic(_anthropic_reply([{"type": "text", "text": "no"}], "max_tokens"))
+
+    with pytest.raises(ClassifierError):
+        await classifier.classify(QUERIES)
+
+    assert len(_logged_lines(caplog)) == 1
+
+
+async def test_an_openai_call_bills_its_cached_prefix_at_the_cached_price(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=MODEL_CALL_LOGGER)
+    usage = {
+        "prompt_tokens": 1000,
+        "completion_tokens": 50,
+        "total_tokens": 1050,
+        "prompt_tokens_details": {"cached_tokens": 800},
+    }
+    classifier, _ = _openai(_openai_reply(json.dumps({"answers": ANSWERS}), "stop", usage=usage))
+
+    await classifier.classify(QUERIES)
+
+    [line] = _logged_lines(caplog)
+    assert (line["kind"], line["model"]) == ("categorize", "openai:gpt-5-mini")
+    assert (line["input_tokens"], line["cache_read_tokens"], line["cache_write_tokens"]) == (
+        200,
+        800,
+        0,
+    )
+    assert line["cost"] == pytest.approx((200 * 0.25 + 50 * 2.00 + 800 * 0.025) / 1e6)

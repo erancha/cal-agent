@@ -70,8 +70,9 @@ registry, `allowed-callers.yaml`, is gitignored and not checked by the hook.
   or another repo's as a guest (`EC2_HOST_STACK` of `params.sh`), behind its own CloudFront
   distribution (`template-ec2.yaml`, `docker-compose.ec2.yml`), in the account of the gitignored
   `lib/aws-config.sh`.
-- `docker-helper.sh [--ec2]` — `--stop [--volumes]`, `--logs [-e] [service...]`, `--ps`;
-  `--ec2 --delete-stack` deletes this repo's EC2 stack.
+- `docker-helper.sh [--ec2]` — `--stop [--volumes]`, `--logs [-e] [service...]`, `--ps`,
+  `--costs [--since <age>]` (model spend by day and kind, summed by `lib/docker_helper.py`, the
+  same file in every Docker repo); `--ec2 --delete-stack` deletes this repo's EC2 stack.
 - `lib/ec2.sh` — the EC2 target: the stack's deploy, SSH with an Instance Connect key, Compose
   against the instance's daemon. It, `template-ec2.yaml`, `lib/settings-guard.sh` (the checks
   behind the pre-commit hook) and `.githooks/pre-commit` are the same files in every Docker

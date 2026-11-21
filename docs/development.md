@@ -117,10 +117,13 @@ reachable.
   It prints the CloudFront address to register with Google
   ([Sign-in](sign-in.md#setting-up-google)) and the values a caller's operator records there.
 - [`docker-helper.sh`](../scripts/docker-helper.sh) — `--stop [--volumes]`,
-  `--logs [-e] [service...]` or `--ps` for the stack; `--volumes` also drops the paused tasks
-  and the merchant memory held in the Redis volume, and on the instance the statements. With
-  `--ec2` as its first argument it acts on the instance, and `--ec2 --delete-stack` deletes this
-  repo's EC2 stack: its port on the instance and its distribution.
+  `--logs [-e] [service...]`, `--ps` or `--costs [--since <age>]` for the stack; `--volumes`
+  also drops the paused tasks and the merchant memory held in the Redis volume, and on the
+  instance the statements. `--costs` sums the model calls of the running containers' logs by UTC
+  day and by kind of call (a batch of merchants to categorize), in dollars at the prices of
+  `src/calagent/adapters/model_costs.py`. With `--ec2` as its first argument it acts on the
+  instance, and `--ec2 --delete-stack` deletes this repo's EC2 stack: its port on the instance
+  and its distribution.
 - [`test.sh`](../scripts/test.sh) — the quality gate, above.
 - [`init-env.sh`](../scripts/init-env.sh) — creates the settings files, above; `--force`
   replaces existing ones, hand-filled keys included.

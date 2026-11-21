@@ -1,13 +1,16 @@
 """Process logging: structlog and standard-library records rendered through one stderr handler.
 
 LOG_LEVEL sets the root level; A2A_LOG_LEVEL sets the SDK's own loggers, which are chatty at
-INFO. Uvicorn's loggers are routed to the same handler so every line has one format.
+INFO. Uvicorn's loggers are routed to the same handler so every line has one format. The
+model_call logger stays at INFO, so each model call's line reaches the log whatever the level.
 """
 
 import logging
 import sys
 
 import structlog
+
+from calagent.adapters.model_costs import MODEL_CALL_LOGGER
 
 A2A_LOGGER = "a2a"
 UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
@@ -42,6 +45,7 @@ def configure_logging(level: str, a2a_level: str) -> None:
     root.handlers[:] = [handler]
     root.setLevel(level.upper())
     logging.getLogger(A2A_LOGGER).setLevel(a2a_level.upper())
+    logging.getLogger(MODEL_CALL_LOGGER).setLevel(logging.INFO)
     for name in UVICORN_LOGGERS:
         uvicorn_logger = logging.getLogger(name)
         uvicorn_logger.handlers.clear()
