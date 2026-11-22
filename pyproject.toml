@@ -3,7 +3,7 @@ name = "calagent"
 version = "0.1.0"
 description = "Cal card agent: reads Cal credit-card PDF statements and streams rows over A2A"
 license = "PolyForm-Noncommercial-1.0.0"
-authors = [{ name = "Eran C", email = "erancha@gmail.com" }]
+authors = [{ name = "Eran Hachmon", email = "erancha@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "a2a-sdk[fastapi]>=1.2.2,<2",
