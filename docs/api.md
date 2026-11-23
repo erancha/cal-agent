@@ -35,6 +35,8 @@ document whose `detail` names the cause. What the page does with these routes, a
 is refused, is in [The statements page](architecture/statements.md#the-statements-page).
 
 - `GET /statements.html` — the page itself, a static file; open.
+- `GET /landing.css` and `GET /favicon.svg` — the stylesheet of the page's signed-out landing
+  card, shared byte for byte with the author's other apps, and the tab's icon; static files, open.
 - `GET /api/auth/config` — this agent's Google client id for the page, `clientId`; open, and
   `null` when the agent runs with authentication off.
 - `GET /api/statements` — the person's statement files: `fileName`, `sizeBytes`, `modified`.

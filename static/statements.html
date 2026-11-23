@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cal-agent statements</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="landing.css">
 <style>
   :root {
     --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --line: #dcdcd6; --panel: #ffffff;
@@ -49,11 +50,24 @@
   .hint { font-size: 0.85rem; color: var(--muted); margin: 8px 0 0; }
   #who { display: flex; gap: 12px; align-items: center; justify-content: flex-end;
     font-size: 0.9rem; color: var(--muted); margin: 0 0 16px; }
+  /* The signed-out landing card (landing.css) takes the viewport over this page's column, at
+     the 16px root size its rules are written for. */
+  .landing { max-width: none; margin: 0; font-size: 16px; }
+  /* No build line follows the tagline here, so the tagline keeps that line's gap to the pitch. */
+  .landing .landing-card .app-tagline { margin-bottom: 20px; }
+  /* Google's script draws its own button, which signs the person in; it lies transparent over
+     the shared button and at its size, so the page looks like every other app's landing page
+     while the click lands on Google's button. */
+  .landing .sign-in { position: relative; }
+  .landing #google-button { position: absolute; display: grid; place-items: center;
+    overflow: hidden; opacity: 0; }
+  .landing .sign-in:has(#google-button:focus-within) .sign-in-button {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<main>
+<main id="app">
   <header id="who" hidden>
     <span>Signed in as <span id="email"></span></span>
     <button type="button" class="secondary" id="signout">Sign out</button>
@@ -61,13 +75,6 @@
   <h1>Statements</h1>
   <p class="lead">Load your Cal (כאל) statement PDFs into the folder cal-agent
     reads for you, or delete one from it.</p>
-
-  <section id="signin" hidden>
-    <h2>Sign in</h2>
-    <p class="hint">Your statements are yours alone: sign in with the Google account you use in
-      the app that reads your transactions.</p>
-    <div id="google-button" class="row"></div>
-  </section>
 
   <section id="load" hidden>
     <h2>Load a statement</h2>
@@ -87,6 +94,70 @@
     </table>
     <p class="hint" id="empty" hidden>No statements loaded.</p>
   </section>
+</main>
+<main class="landing" id="signin" hidden>
+  <div class="landing-card">
+    <h1 class="app-heading"><img class="app-icon" src="favicon.svg" alt=""> cal-agent</h1>
+    <p class="app-tagline">Your Cal card statements, every charge in its category</p>
+    <p class="landing-pitch"><strong>Load your Cal (כאל) statement PDFs here,</strong> and the agent
+      will read and analyze every charge on demand from a caller agent.</p>
+    <ol class="landing-steps">
+      <li><span><strong>Sign in with Google</strong>: you see and delete only your own
+        files.</span></li>
+      <li><span><strong>Load your statement PDFs</strong>: under any file name; each is filed under
+        its billing month.</span></li>
+      <li><span><strong>Charges are categorized on request</strong>: when a caller agent asks for a
+        month, the agent reads it, and AI picks a category only for a merchant it hasn't
+        categorized for you before.</span></li>
+    </ol>
+    <ul class="landing-details" id="details" hidden>
+      <li>Every amount and date is read from the statement itself; <strong>AI only picks each
+        merchant's category.</strong></li>
+      <li><strong>A month comes back whole or not at all:</strong> its charges are checked against
+        the total the statement prints.</li>
+      <li>Installments, standing orders and purchases abroad are read the way Cal prints them.</li>
+      <li>When a month's statement is missing, the app that asked for it waits; once you load it
+        here, the review goes on.</li>
+      <li>cal-agent never logs in to the Cal site: it reads only the statements you load.</li>
+      <li>One statement per month: to replace one, delete the old file first.</li>
+    </ul>
+    <button type="button" class="landing-more" id="more" aria-expanded="false">More</button>
+    <div class="sign-in" id="sign-in-area">
+      <button type="button" class="sign-in-button" tabindex="-1"><span class="sign-in-mark"
+        aria-hidden="true">G</span>Sign in with Google</button>
+      <div id="google-button"></div>
+      <div class="sign-in-why-row">
+        <button type="button" class="sign-in-why" id="why" aria-expanded="false"
+          aria-controls="why-text">Why sign in with Google?</button>
+        <button type="button" class="sign-in-why-close" id="why-close"
+          aria-label="Close the explanation" hidden>✕</button>
+      </div>
+      <div class="sign-in-why-text" id="why-text" hidden>
+        <p>Signing in with Google is <strong>safer and easier</strong> than opening an account
+          with a new password.</p>
+        <ul class="landing-details">
+          <li><strong>Google approves the sign-in.</strong> Google gives the app
+            only a confirmation of who you are, with no access to your data (emails, contacts
+            and more).</li>
+          <li><strong>You stay in control:</strong> you can disconnect
+            the app at any time in your Google account's settings.</li>
+          <li><strong>No new password to remember,</strong> and none that could leak from here:
+            the app stores no passwords at all.</li>
+          <li><strong>Google's protections work for you:</strong> two-step verification and
+            alerts on a suspicious sign-in guard your sign-in here too.</li>
+        </ul>
+        <a href="https://support.google.com/accounts/answer/12921417" target="_blank"
+          rel="noreferrer" aria-label="Google's full explanation (opens in a new tab)">Google's
+          full explanation <span aria-hidden="true">↗</span></a>
+      </div>
+    </div>
+  </div>
+  <footer class="landing-links">
+    <a id="invite" href="https://wa.me/?text=" target="_blank" rel="noreferrer"><span
+      class="link-mark" aria-hidden="true">💬</span>Invite friends on WhatsApp</a>
+    <a href="https://github.com/erancha/cal-agent" target="_blank" rel="noreferrer">Source code on
+      GitHub</a>
+  </footer>
 </main>
 <script>
   const API = "/api/statements";
@@ -129,6 +200,7 @@
       return false;
     }
     credential = null;
+    visible("app", false);
     visible("signin", true);
     visible("who", false);
     visible("load", false);
@@ -141,6 +213,7 @@
     const claims = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
     document.getElementById("email").textContent = claims.email ?? claims.sub;
     visible("signin", false);
+    visible("app", true);
     visible("who", true);
     visible("load", true);
     visible("loaded", true);
@@ -153,12 +226,77 @@
     script.async = true;
     script.onload = () => {
       google.accounts.id.initialize({ client_id: clientId, callback: r => signedIn(r.credential) });
-      google.accounts.id.renderButton(document.getElementById("google-button"),
-          { theme: "outline", size: "large", text: "signin_with" });
+      new ResizeObserver(renderGoogleButton).observe(sharedButton);
     };
     script.onerror = () => show("Google's sign-in script did not load.", "err");
     document.head.append(script);
   }
+
+  const sharedButton = document.querySelector(".sign-in-button");
+  const googleButton = document.getElementById("google-button");
+
+  /** Lays Google's button over the shared one at its place and size. Google draws its button at
+   * a fixed width, so it is drawn again whenever the shared button's size changes. */
+  function renderGoogleButton() {
+    if (sharedButton.offsetWidth === 0) {
+      // The landing card is hidden: signed in, or authentication is off.
+      return;
+    }
+    for (const side of ["Top", "Left", "Width", "Height"]) {
+      googleButton.style[side.toLowerCase()] = sharedButton["offset" + side] + "px";
+    }
+    google.accounts.id.renderButton(googleButton,
+        { theme: "outline", size: "large", text: "signin_with", width: sharedButton.offsetWidth });
+  }
+
+  // The invite's paragraphs, in the voice of the friend who sends it; an empty line separates
+  // them, and the page's own address closes the message, so it names whichever deployment sent it.
+  const INVITE_MESSAGE = [
+    "Hi! 👋 I got a recommendation for cal-agent, for anyone with a Cal (כאל) credit card who " +
+        "wants their monthly spending reviewed.",
+    "📄 You load your monthly statement PDFs on its page, and the app that reviews your " +
+        "spending gets every charge in its category, such as groceries or insurance.",
+    "Only you see your statements, and you sign in with your Google account, with no new " +
+        "password.",
+    "Here is the page:",
+  ];
+  document.getElementById("invite").href = "https://wa.me/?text=" + encodeURIComponent(
+      INVITE_MESSAGE.join("\n\n") + "\n" + location.origin + location.pathname);
+
+  const more = document.getElementById("more");
+
+  /** Shows or folds the pitch's details under the More toggle. */
+  function showDetails(open) {
+    more.setAttribute("aria-expanded", String(open));
+    more.textContent = open ? "Less" : "More";
+    document.getElementById("details").hidden = !open;
+  }
+
+  more.addEventListener("click", () => showDetails(more.getAttribute("aria-expanded") === "false"));
+
+  const why = document.getElementById("why");
+  const whyClose = document.getElementById("why-close");
+
+  /** Opens or closes the explanation under the sign-in button, framing the sign-in area. */
+  function explain(open) {
+    why.setAttribute("aria-expanded", String(open));
+    whyClose.hidden = !open;
+    document.getElementById("why-text").hidden = !open;
+    document.getElementById("sign-in-area").classList.toggle("sign-in-open", open);
+    // Opening folds the pitch's details back, so one subject is open at a time.
+    if (open) showDetails(false);
+    // Opening scrolls down to the explanation's last line, which on a phone opens below the fold.
+    if (open) {
+      document.getElementById("why-text").scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }
+
+  why.addEventListener("click", () => explain(why.getAttribute("aria-expanded") === "false"));
+  whyClose.addEventListener("click", () => {
+    explain(false);
+    // The close button hides with the text, so focus returns to what reopens it.
+    why.focus();
+  });
 
   document.getElementById("signout").addEventListener("click", () => {
     google.accounts.id.disableAutoSelect();
@@ -180,6 +318,7 @@
       refresh();
       return;
     }
+    visible("app", false);
     visible("signin", true);
     loadGoogle(clientId);
   }

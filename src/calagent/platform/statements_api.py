@@ -2,7 +2,8 @@
 their own Cal statement files.
 
 Core building blocks:
-- add_statements_routes: the page, the auth config the page reads, and the three statements routes
+- add_statements_routes: the page with its stylesheet and icon, the auth config the page reads,
+  and the three statements routes
 - ApiProblem: a refusal answered as a problem document whose detail names the cause
 - _person: the person the bearer token was issued to for the page's own client; with
   authentication off every request is for the person anonymous
@@ -66,9 +67,25 @@ def add_statements_routes(
     async def unreadable(_: Request, failure: StatementError) -> Response:
         return _problem_response(400, "Bad Request", str(failure))
 
+    # A browser checks the page and its files again on every load, so an edit shows at once.
+    revalidate = {"Cache-Control": "no-cache"}
+
     @app.get(PAGE_PATH, include_in_schema=False)
     async def page() -> FileResponse:
-        return FileResponse(page_path, media_type="text/html")
+        return FileResponse(page_path, media_type="text/html", headers=revalidate)
+
+    # The landing card's shared stylesheet and the tab's icon, which the page links beside itself.
+    @app.get("/landing.css", include_in_schema=False)
+    async def landing_styles() -> FileResponse:
+        return FileResponse(
+            page_path.parent / "landing.css", media_type="text/css", headers=revalidate
+        )
+
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def icon() -> FileResponse:
+        return FileResponse(
+            page_path.parent / "favicon.svg", media_type="image/svg+xml", headers=revalidate
+        )
 
     @app.get("/api/auth/config")
     async def auth_config() -> dict[str, str | None]:

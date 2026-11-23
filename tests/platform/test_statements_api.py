@@ -1,3 +1,4 @@
+import re
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from pathlib import Path
@@ -165,6 +166,87 @@ async def test_the_page_is_served_without_a_client_id(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "Cal" in response.text
     assert ".apps.googleusercontent.com" not in response.text
+
+
+async def test_the_sign_in_explains_why_google_is_safe(tmp_path: Path) -> None:
+    async with http_client(make_app(tmp_path), None, secret=None) as client:
+        page = (await client.get("/statements.html")).text
+    assert 'aria-expanded="false"' in page
+    assert ">Why sign in with Google?</button>" in page
+    # Opening scrolls down to the explanation's last line.
+    assert 'getElementById("why-text").scrollIntoView({ behavior: "smooth", block: "end" })' in page
+    # Opening it folds the pitch's details back.
+    assert "if (open) showDetails(false);" in page
+    for lead in (
+        "safer and easier",
+        "Google approves the sign-in.",
+        "You stay in control:",
+        "No new password to remember,",
+        "Google's protections work for you:",
+    ):
+        assert f"<strong>{lead}</strong>" in page
+    link = re.search(r'<a href="https://support\.google\.com/accounts/answer/12921417"[^>]*>', page)
+    assert link is not None
+    for attribute in (
+        'target="_blank"',
+        'rel="noreferrer"',
+        'aria-label="Google\'s full explanation (opens in a new tab)"',
+    ):
+        assert attribute in link.group()
+    assert 'aria-label="Close the explanation"' in page
+
+
+async def test_the_signed_out_page_is_the_shared_landing_card(tmp_path: Path) -> None:
+    async with http_client(make_app(tmp_path), None, secret=None) as client:
+        page = " ".join((await client.get("/statements.html")).text.split())
+    assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in page
+    assert '<link rel="stylesheet" href="landing.css">' in page
+    assert '<main class="landing" id="signin" hidden>' in page
+    icon = '<img class="app-icon" src="favicon.svg" alt="">'
+    assert f'<h1 class="app-heading">{icon} cal-agent</h1>' in page
+    assert '<p class="app-tagline">' in page
+    assert "app-version" not in page
+    assert page.count('<p class="landing-pitch">') == 1
+    assert "<strong>Charges are categorized on request</strong>" in page
+    assert '<ol class="landing-steps">' in page
+    assert '<ul class="landing-details" id="details" hidden>' in page
+    assert (
+        '<button type="button" class="landing-more" id="more" aria-expanded="false">More</button>'
+        in page
+    )
+    assert (
+        '<button type="button" class="sign-in-button" tabindex="-1">'
+        '<span class="sign-in-mark" aria-hidden="true">G</span>Sign in with Google</button>'
+    ) in page
+    assert '<div id="google-button"></div>' in page
+
+
+async def test_the_landing_links_invite_on_whatsapp_and_open_the_source(tmp_path: Path) -> None:
+    async with http_client(make_app(tmp_path), None, secret=None) as client:
+        page = " ".join((await client.get("/statements.html")).text.split())
+    footer = re.search(r'<footer class="landing-links">(.*?)</footer>', page)
+    assert footer is not None
+    links = re.findall(r"<a [^>]*>", footer.group(1))
+    assert len(links) == 2, "no demo link: cal-agent has no demo"
+    invite, source = links
+    assert 'href="https://wa.me/?text=' in invite
+    assert 'href="https://github.com/erancha/cal-agent"' in source
+    for link in links:
+        assert 'target="_blank"' in link and 'rel="noreferrer"' in link
+    assert '<span class="link-mark" aria-hidden="true">💬</span>' in footer.group(1)
+
+
+async def test_the_shared_landing_styles_and_icon_are_served(tmp_path: Path) -> None:
+    async with http_client(make_app(tmp_path), None, secret=None) as client:
+        page = await client.get("/statements.html")
+        css = await client.get("/landing.css")
+        icon = await client.get("/favicon.svg")
+    # A browser checks each file again on every load, so an edited icon or style shows at once.
+    assert {r.headers["cache-control"] for r in (page, css, icon)} == {"no-cache"}
+    assert css.status_code == 200 and css.headers["content-type"].startswith("text/css")
+    assert css.content == Path("static/landing.css").read_bytes()
+    assert icon.status_code == 200 and icon.headers["content-type"] == "image/svg+xml"
+    assert icon.content.startswith(b"<svg")
 
 
 def test_startup_refuses_a_static_folder_without_the_page(tmp_path: Path) -> None:
