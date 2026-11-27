@@ -211,9 +211,9 @@ async def test_the_signed_out_page_is_the_shared_landing_card(tmp_path: Path) ->
     assert '<ol class="landing-steps">' in page
     assert '<ul class="landing-details" id="details" hidden>' in page
     assert (
-        '<button type="button" class="landing-more landing-flash" id="more" aria-expanded="false">More</button>'
-        in page
-    )
+        '<button type="button" class="landing-more landing-flash" id="more" '
+        'aria-expanded="false">More</button>'
+    ) in page
     assert (
         '<button type="button" class="sign-in-button" tabindex="-1">'
         '<span class="sign-in-mark" aria-hidden="true">G</span>Sign in with Google</button>'
