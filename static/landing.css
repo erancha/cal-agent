@@ -69,10 +69,11 @@
   border-radius: 12px;
 }
 
-/* On a phone the text takes more of the narrow card, so the card reads less tall and thin. */
+/* On a phone the text takes more of the narrow card, so the card reads less tall and thin, and
+   its thinner top and bottom bring the links under it closer to the fold. */
 @media (max-width: 48rem) {
   .landing .landing-card {
-    padding-inline: 22px;
+    padding: 20px 22px;
   }
 }
 
@@ -139,6 +140,23 @@
 
 .landing .landing-links a {
   color: var(--mute);
+}
+
+/* The demo link flashes like the details toggle on a browser's first two visits: five
+   one-second flashes on the first, two on the second. The page picks the class per visit. */
+.landing .landing-links .demo-flash-first {
+  animation: landing-attention-flash 1s step-end 5;
+}
+
+.landing .landing-links .demo-flash-second {
+  animation: landing-attention-flash 1s step-end 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing .landing-links .demo-flash-first,
+  .landing .landing-links .demo-flash-second {
+    animation: none;
+  }
 }
 
 .landing .link-mark {
