@@ -18,7 +18,8 @@
   --ink: #1b2430;
   --mute: #5f6b7a;
   --accent: #1f5fbf;
-  --red: #b3261e;
+  --flash-ink: #5b95e3;
+  --flash-bg: #e3eefc;
   --sign-in-border: #ccc;
   --sign-in-mark: #1f4e8c;
   /* The open sign-in explanation: dark green text on a green just off white, a calm cue of safety
@@ -51,11 +52,39 @@
     --ink: #e8ecf1;
     --mute: #98a3b1;
     --accent: #6ea4f0;
-    --red: #f2827a;
+    --flash-ink: #b4d1f8;
+    --flash-bg: #1f3554;
     --sign-in-border: #555e6b;
     --sign-in-mark: var(--accent);
     --sign-in-panel: #121d17;
     --sign-in-panel-ink: #8fdcb0;
+  }
+}
+
+/* The one flash of every element that draws the eye when the page opens: each half second its
+   text turns between the accent blue and a lighter blue on light blue, then rests at its own
+   style. It runs no flashes unless a later rule for the element sets how many. */
+.landing .landing-flash {
+  padding-inline: 4px;
+  border-radius: 4px;
+  animation: landing-attention-flash 1s step-end;
+  animation-iteration-count: 0;
+}
+
+@keyframes landing-attention-flash {
+  0% {
+    color: var(--accent);
+  }
+
+  50% {
+    color: var(--flash-ink);
+    background: var(--flash-bg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing .landing-flash {
+    animation: none;
   }
 }
 
@@ -110,12 +139,14 @@
   color: var(--mute);
 }
 
-/* Close under the title, so the two read as one heading. */
+/* Close under the title, so the two read as one heading; three flashes when the page opens. */
 .landing .landing-card .app-tagline {
-  margin: 0;
+  width: fit-content;
+  margin: 0 auto;
+  animation-iteration-count: 3;
   color: var(--accent);
   text-align: center;
-  font-size: 1rem;
+  font-size: calc(1rem + 1px);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -142,21 +173,19 @@
   color: var(--mute);
 }
 
-/* The demo link flashes like the details toggle on a browser's first two visits: five
-   one-second flashes on the first, two on the second. The page picks the class per visit. */
+/* The demo link flashes on a browser's first two visits, once the tagline's flashes are over:
+   five one-second flashes on the first, two on the second. The page picks the class per visit. */
+.landing .landing-links .demo-flash-first,
+.landing .landing-links .demo-flash-second {
+  animation-delay: 3s;
+}
+
 .landing .landing-links .demo-flash-first {
-  animation: landing-attention-flash 1s step-end 5;
+  animation-iteration-count: 5;
 }
 
 .landing .landing-links .demo-flash-second {
-  animation: landing-attention-flash 1s step-end 2;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing .landing-links .demo-flash-first,
-  .landing .landing-links .demo-flash-second {
-    animation: none;
-  }
+  animation-iteration-count: 2;
 }
 
 .landing .link-mark {
@@ -229,28 +258,13 @@
   font-weight: 700;
 }
 
-/* Five one-second flashes when the page opens, between regular muted and bold red, draw the eye
-   to the details toggle; it then rests at its own style. */
+/* Five one-second flashes draw the eye to the details toggle ten seconds after the page opens,
+   once the visitor has had time to read the pitch and the steps, and the demo link's flashes
+   are over. */
 .landing .landing-more {
   margin: 4px 0 20px;
-  animation: landing-attention-flash 1s step-end 5;
-}
-
-@keyframes landing-attention-flash {
-  0% {
-    font-weight: 400;
-  }
-
-  50% {
-    color: var(--red);
-    font-weight: 700;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing .landing-more {
-    animation: none;
-  }
+  animation-delay: 10s;
+  animation-iteration-count: 5;
 }
 
 .landing .landing-more::before,
