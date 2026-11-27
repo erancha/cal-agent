@@ -139,11 +139,13 @@
   color: var(--mute);
 }
 
-/* Close under the title, so the two read as one heading; three flashes when the page opens. */
+/* Close under the title, so the two read as one heading; two quick half-second flashes when the
+   page opens. */
 .landing .landing-card .app-tagline {
   width: fit-content;
   margin: 0 auto;
-  animation-iteration-count: 3;
+  animation-duration: 0.5s;
+  animation-iteration-count: 2;
   color: var(--accent);
   text-align: center;
   font-size: calc(1rem + 1px);
@@ -173,11 +175,11 @@
   color: var(--mute);
 }
 
-/* The demo link flashes on a browser's first two visits, once the tagline's flashes are over:
-   five one-second flashes on the first, two on the second. The page picks the class per visit. */
+/* The demo link flashes on a browser's first two visits, 15 seconds after the page opens: five
+   one-second flashes on the first visit, two on the second. The page picks the class per visit. */
 .landing .landing-links .demo-flash-first,
 .landing .landing-links .demo-flash-second {
-  animation-delay: 3s;
+  animation-delay: 15s;
 }
 
 .landing .landing-links .demo-flash-first {
@@ -258,12 +260,11 @@
   font-weight: 700;
 }
 
-/* Five one-second flashes draw the eye to the details toggle ten seconds after the page opens,
-   once the visitor has had time to read the pitch and the steps, and the demo link's flashes
-   are over. */
+/* Five one-second flashes draw the eye to the details toggle 30 seconds after the page opens, once
+   the sign-in button's pulses are over, for a visitor still reading. */
 .landing .landing-more {
   margin: 4px 0 20px;
-  animation-delay: 10s;
+  animation-delay: 30s;
   animation-iteration-count: 5;
 }
 
@@ -316,15 +317,42 @@
   color: var(--sign-in-panel-ink);
 }
 
+/* A visitor still on the page after 20 seconds, once the demo link's flashes are over, sees the
+   button's border pulse twice: each pulse thickens it by 1px every 0.2 seconds, to 6px, then thins
+   it back the same way to its 1px. The padding gives up what the border takes, so the button keeps
+   its size and nothing around it moves. */
 .landing .sign-in-button {
-  padding: 0.6rem 2.5rem;
-  border: 1px solid var(--sign-in-border);
+  padding: calc(0.6rem + 1px - var(--sign-in-border-width))
+    calc(2.5rem + 1px - var(--sign-in-border-width));
+  border: var(--sign-in-border-width) solid var(--sign-in-border);
   border-radius: 999px;
   background: var(--panel);
   color: var(--ink);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  /* Five 0.2-second steps each way, so each half of a pulse takes a second. */
+  animation: sign-in-border-pulse 2s steps(5) 20s 2;
+}
+
+/* Registered as a length, so the animation steps through the widths between its keyframes
+   rather than flipping from one end to the other halfway. */
+@property --sign-in-border-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 1px;
+}
+
+@keyframes sign-in-border-pulse {
+  50% {
+    --sign-in-border-width: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing .sign-in-button {
+    animation: none;
+  }
 }
 
 .landing .sign-in-button:hover {
