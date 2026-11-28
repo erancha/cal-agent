@@ -26,6 +26,8 @@
      that sets the text about Google apart from the pitch above it. */
   --sign-in-panel: #f7fcf8;
   --sign-in-panel-ink: #17633a;
+  /* The sign-in button's border while its width pulses. */
+  --sign-in-pulse-border: #000;
   position: fixed;
   inset: 0;
   overflow-y: auto;
@@ -58,6 +60,7 @@
     --sign-in-mark: var(--accent);
     --sign-in-panel: #121d17;
     --sign-in-panel-ink: #8fdcb0;
+    --sign-in-pulse-border: #fff;
   }
 }
 
@@ -139,16 +142,13 @@
   color: var(--mute);
 }
 
-/* Close under the title, so the two read as one heading; two quick half-second flashes when the
-   page opens. */
+/* Close under the title, so the two read as one heading; it runs none of the page's flashes. */
 .landing .landing-card .app-tagline {
   width: fit-content;
   margin: 0 auto;
-  animation-duration: 0.5s;
-  animation-iteration-count: 2;
   color: var(--accent);
   text-align: center;
-  font-size: calc(1rem + 1px);
+  font-size: calc(1rem + 3px);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -318,34 +318,56 @@
 }
 
 /* A visitor still on the page after 20 seconds, once the demo link's flashes are over, sees the
-   button's border pulse twice: each pulse thickens it by 1px every 0.2 seconds, to 6px, then thins
-   it back the same way to its 1px. The padding gives up what the border takes, so the button keeps
-   its size and nothing around it moves. */
+   button's width pulse twice: each pulse changes it by 10px every 0.1 seconds, to 90px off
+   its own width, then back the same way. From 48rem the button widens, its padding growing on both
+   sides; on a phone, where it already fills the card, it narrows toward the card's middle
+   instead. While the pulses run, the button's border turns black, white in dark mode,
+   and returns to its own colour when they end. */
 .landing .sign-in-button {
-  padding: calc(0.6rem + 1px - var(--sign-in-border-width))
-    calc(2.5rem + 1px - var(--sign-in-border-width));
-  border: var(--sign-in-border-width) solid var(--sign-in-border);
+  --sign-in-pulse-period: 1.8s;
+  --sign-in-pulse-count: 2;
+  padding: 0.6rem calc(2.5rem + var(--sign-in-pulse) / 2);
+  border: 1px solid var(--sign-in-border);
   border-radius: 999px;
   background: var(--panel);
   color: var(--ink);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  /* Five 0.2-second steps each way, so each half of a pulse takes a second. */
-  animation: sign-in-border-pulse 2s steps(5) 20s 2;
+  /* Nine 0.1-second steps each way, so each half of a pulse takes 0.9 seconds. The border's colour
+     holds for exactly as long as all the pulses together. */
+  animation:
+    sign-in-width-pulse var(--sign-in-pulse-period) steps(9) 20s var(--sign-in-pulse-count),
+    sign-in-pulse-border calc(var(--sign-in-pulse-period) * var(--sign-in-pulse-count)) 20s;
 }
 
-/* Registered as a length, so the animation steps through the widths between its keyframes
-   rather than flipping from one end to the other halfway. */
-@property --sign-in-border-width {
+@keyframes sign-in-pulse-border {
+  from,
+  to {
+    border-color: var(--sign-in-pulse-border);
+  }
+}
+
+/* How far the pulse has moved the button's width from its own. Registered as a length, so the
+   animation steps through the values between its keyframes rather than flipping from one end to
+   the other halfway. */
+@property --sign-in-pulse {
   syntax: "<length>";
   inherits: false;
-  initial-value: 1px;
+  initial-value: 0px;
 }
 
-@keyframes sign-in-border-pulse {
+@keyframes sign-in-width-pulse {
   50% {
-    --sign-in-border-width: 6px;
+    --sign-in-pulse: 90px;
+  }
+}
+
+@media (width < 48rem) {
+  .landing .sign-in-button {
+    align-self: center;
+    width: calc(100% - var(--sign-in-pulse));
+    padding-inline: 2.5rem;
   }
 }
 
