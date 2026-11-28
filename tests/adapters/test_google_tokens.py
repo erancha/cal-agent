@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from jwt import PyJWKClient
 
 from calagent.adapters.google_tokens import (
+    CLOCK_SKEW_SECONDS,
     GOOGLE_ISSUER,
     GoogleTokenVerifier,
     JwksKeys,
@@ -45,6 +46,11 @@ def claims_of(token: str) -> dict[str, Any]:
     return jwt.decode(token, options={"verify_signature": False})
 
 
+def test_a_token_issued_moments_ahead_of_this_clock_is_accepted() -> None:
+    ahead = int(time.time()) + CLOCK_SKEW_SECONDS // 2
+    assert verify(sign(iat=ahead)).sub == "1000"
+
+
 def test_a_valid_token_names_the_person() -> None:
     assert verify(sign()) == VerifiedPerson("1000", "dana@example.com")
 
@@ -64,7 +70,7 @@ def test_google_bare_issuer_form_is_accepted_for_google_only() -> None:
 @pytest.mark.parametrize(
     ("claims", "reason"),
     [
-        ({"exp": int(time.time()) - 1}, "expired"),
+        ({"exp": int(time.time()) - CLOCK_SKEW_SECONDS - 1}, "expired"),
         ({"aud": "other-client"}, "another application"),
         ({"iss": "https://evil.example"}, "not issued by"),
     ],

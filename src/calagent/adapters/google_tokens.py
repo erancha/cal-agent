@@ -25,6 +25,10 @@ from calagent.ports.tokens import VerifiedPerson
 GOOGLE_ISSUER = "https://accounts.google.com"
 GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 ALGORITHM = "RS256"
+# Tolerance on the time claims for a server clock that runs behind or ahead of Google's: without
+# it, a token minted moments ago is refused as issued in the future. Spring's validator, which
+# amex-agent uses, allows the same.
+CLOCK_SKEW_SECONDS = 60
 
 
 class KeySource(Protocol):
@@ -70,6 +74,7 @@ class GoogleTokenVerifier:
                 algorithms=[ALGORITHM],
                 audience=audience,
                 issuer=self._issuers,
+                leeway=CLOCK_SKEW_SECONDS,
                 options={"require": ["exp", "iat", "sub", "aud", "iss"]},
             )
         except jwt.ExpiredSignatureError as error:
